@@ -8,7 +8,8 @@ package signer
 
 import (
 	"crypto"
-	"crypto/x509"
+	//"crypto/x509"
+	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"io"
 
 	"github.com/hyperledger/fabric/bccsp"
