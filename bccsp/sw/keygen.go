@@ -21,6 +21,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/hyperledger/fabric/bccsp"
@@ -52,6 +53,7 @@ func (kg *aesKeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
 	return &aesPrivateKey{lowLevelKey, false}, nil
 }
 
+// to do package gm
 type sm2KeyGenerator struct {
 	curve elliptic.Curve
 }

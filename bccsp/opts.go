@@ -28,6 +28,8 @@ const (
 	// through which hash will actually do nothing
 	SM3SIG = "SM3SIG"
 	// SM2ReRand SM2 key re-randomization
+	// to do discuss here duplicate const
+	// and we'd better remove const out of this lib, into a gm impl package.
 	SM2ReRand = "SM2"
 
 	// AES Advanced Encryption Standard at the default security level.
@@ -274,6 +276,7 @@ func (opts *X509PublicKeyImportOpts) Ephemeral() bool {
 }
 
 // SM2ReRandKeyOpts contains options for SM2 key re-randomization.
+// to do remove to gm package
 type SM2ReRandKeyOpts struct {
 	Temporary bool
 	Expansion []byte
@@ -295,8 +298,8 @@ func (opts *SM2ReRandKeyOpts) ExpansionValue() []byte {
 	return opts.Expansion
 }
 
-
 // SHA256Opts contains options relating to SHA-256.
+// to do remove to gm package
 type SM3Opts struct {
 }
 
@@ -315,6 +318,7 @@ func (opts *SM3SIGOpts) Algorithm() string {
 }
 
 // SM2KeyGenOpts contains options for SM2 key generation.
+// to do remove to gm package
 type SM2KeyGenOpts struct {
 	Temporary bool
 }
@@ -348,6 +352,7 @@ func (opts *SM2PKIXPublicKeyImportOpts) Ephemeral() bool {
 
 // SM2PrivateKeyImportOpts contains options for SM2 secret key importation in DER format
 // or PKCS#8 format.
+// to do remove to gm package
 type SM2PrivateKeyImportOpts struct {
 	Temporary bool
 }

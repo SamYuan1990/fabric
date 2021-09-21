@@ -9,11 +9,13 @@ package sw
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
-//	"crypto/x509"
+
+	//	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"reflect"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"github.com/hyperledger/fabric/bccsp"
@@ -114,6 +116,7 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &ecdsaPublicKey{lowLevelKey}, nil
 }
 
+// package gm
 type x509PublicKeyImportOptsKeyImporter struct {
 	bccsp *CSP
 }
@@ -135,9 +138,10 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 		// This path only exists to support environments that use RSA certificate
 		// authorities to issue ECDSA certificates.
 		return &rsaPublicKey{pubKey: pk}, nil
+	// todo:reg...
 	case *sm2.PublicKey:
 		return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{})].KeyImport(
-			pk.(*sm2.PublicKey), &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()})	
+			pk.(*sm2.PublicKey), &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
 	default:
 		return nil, errors.New("Certificate's public key type not recognized. Supported keys: [ECDSA, RSA]")
 	}

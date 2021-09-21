@@ -9,10 +9,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
-	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"encoding/pem"
 	"fmt"
 	"reflect"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
@@ -154,6 +155,7 @@ func (i *RevocationPublicKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyI
 	if blockPub == nil {
 		return nil, errors.New("Failed to decode revocation ECDSA public key")
 	}
+	// to do here, replace x509.ParsePKIXPublicKey into a key import function?
 	revocationPk, err := x509.ParsePKIXPublicKey(blockPub.Bytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to parse revocation ECDSA public key bytes")

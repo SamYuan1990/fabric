@@ -9,8 +9,9 @@ package signer
 import (
 	"crypto"
 	//"crypto/x509"
-	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"io"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
@@ -47,7 +48,7 @@ func New(csp bccsp.BCCSP, key bccsp.Key) (crypto.Signer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed marshalling public key")
 	}
-
+	//to do here, replace x509.ParsePKIXPublicKey into a key import function?
 	pk, err := x509.ParsePKIXPublicKey(raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed marshalling der to public key")
