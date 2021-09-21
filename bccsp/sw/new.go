@@ -10,8 +10,9 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/sha512"
-	"github.com/Hyperledger-TWGC/ccs-gm/sm3"
 	"reflect"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/sm3"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
@@ -61,6 +62,7 @@ func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore
 
 	// Set the Signers
 	swbccsp.AddWrapper(reflect.TypeOf(&ecdsaPrivateKey{}), &ecdsaSigner{})
+	// to do package gm
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2PrivateKey{}), &sm2Signer{})
 
 	// Set the Verifiers

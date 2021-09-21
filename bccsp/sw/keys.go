@@ -10,11 +10,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+
 	//"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
+
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 )
@@ -65,6 +67,7 @@ func PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
 	}
 	switch privateKey.(type) {
 	case *sm2.PrivateKey:
+		// reg
 		return x509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
 	case *ecdsa.PrivateKey:
 		return x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))

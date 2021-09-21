@@ -9,7 +9,6 @@ package sw
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -19,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/hyperledger/fabric/bccsp"
 )
@@ -141,8 +142,14 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		}
 
 		switch k := key.(type) {
+		// go lang reflact...
 		case *ecdsa.PrivateKey:
 			return &ecdsaPrivateKey{k}, nil
+		// to do: move to gm package?
+		// make a map here, instead of switch
+		// at beginning, the map added with case and value(interface? by config?)
+		// and here is the k.type is xxx (in map)... by reg?
+		// to be poc test
 		case *sm2.PrivateKey:
 			return &sm2PrivateKey{key.(*sm2.PrivateKey)}, nil
 		default:
