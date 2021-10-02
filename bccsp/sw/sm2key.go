@@ -19,6 +19,7 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"fmt"
+
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"github.com/hyperledger/fabric/bccsp"

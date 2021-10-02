@@ -182,16 +182,17 @@ func TestX509PublicKeyImportOptsKeyImporter(t *testing.T) {
 
 	_, err := ki.KeyImport("Hello World", &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate in ECDSA or GM")
 
 	_, err = ki.KeyImport(nil, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate in ECDSA or GM")
 
 	cert := &x509.Certificate{}
 	cert.PublicKey = "Hello world"
 	_, err = ki.KeyImport(cert, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
+	//to do adding test for GM
 	assert.Contains(t, err.Error(), "Certificate's public key type not recognized. Supported keys: [ECDSA, RSA]")
 }
 
