@@ -20,9 +20,10 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"github.com/hyperledger/fabric/bccsp"
-	"math/big"
 )
 
 type SM2Signature struct {

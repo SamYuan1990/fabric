@@ -10,6 +10,11 @@ github.com/BurntSushi/toml
 # github.com/DataDog/zstd v1.4.0
 ## explicit
 github.com/DataDog/zstd
+# github.com/Hyperledger-TWGC/ccs-gm v0.1.1
+## explicit
+github.com/Hyperledger-TWGC/ccs-gm/sm2
+github.com/Hyperledger-TWGC/ccs-gm/sm3
+github.com/Hyperledger-TWGC/ccs-gm/x509
 # github.com/Knetic/govaluate v3.0.0+incompatible
 ## explicit
 github.com/Knetic/govaluate
@@ -366,7 +371,7 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
 go.uber.org/zap/zaptest/observer
-# golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+# golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
 ## explicit
 golang.org/x/crypto/sha3
 # golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc

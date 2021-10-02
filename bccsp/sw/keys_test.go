@@ -95,7 +95,7 @@ func TestECDSAKeys(t *testing.T) {
 	}
 
 	// Private Key DER format
-	der, err := privateKeyToDER(key)
+	der, err := PrivateKeyToDER(key)
 	if err != nil {
 		t.Fatalf("Failed converting private key to DER [%s]", err)
 	}
@@ -175,7 +175,7 @@ func TestECDSAKeys(t *testing.T) {
 		t.Fatal("DERToPrivateKey should fail on invalid DER")
 	}
 
-	_, err = privateKeyToDER(nil)
+	_, err = PrivateKeyToDER(nil)
 	if err == nil {
 		t.Fatal("DERToPrivateKey should fail on nil")
 	}

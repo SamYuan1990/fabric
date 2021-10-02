@@ -10,14 +10,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 
-	//	"crypto/x509"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
-	"github.com/Hyperledger-TWGC/ccs-gm/x509"
+	gmx509 "github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"github.com/hyperledger/fabric/bccsp"
 )
 
@@ -122,12 +122,22 @@ type x509PublicKeyImportOptsKeyImporter struct {
 }
 
 func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	x509Cert, ok := raw.(*x509.Certificate)
-	if !ok {
-		return nil, errors.New("Invalid raw material. Expected *x509.Certificate.")
+	validated := false
+	var pk interface{}
+	gmx509Cert, ok := raw.(*gmx509.Certificate)
+	if ok {
+		validated = true
+		pk = gmx509Cert.PublicKey
 	}
 
-	pk := x509Cert.PublicKey
+	x509Cert, ok := raw.(*x509.Certificate)
+	if ok {
+		validated = true
+		pk = x509Cert.PublicKey
+	}
+	if !validated {
+		return nil, errors.New("Invalid raw material. Expected *x509.Certificate in ECDSA or GM")
+	}
 
 	switch pk.(type) {
 	case *ecdsa.PublicKey:
@@ -137,7 +147,7 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	case *rsa.PublicKey:
 		// This path only exists to support environments that use RSA certificate
 		// authorities to issue ECDSA certificates.
-		return &rsaPublicKey{pubKey: pk}, nil
+		return &rsaPublicKey{pubKey: pk.(*rsa.PublicKey)}, nil
 	// todo:reg...
 	case *sm2.PublicKey:
 		return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{})].KeyImport(
