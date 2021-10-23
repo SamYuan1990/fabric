@@ -39,6 +39,7 @@ func NewDefaultSecurityLevelWithKeystore(keyStore bccsp.KeyStore) (bccsp.BCCSP, 
 
 // NewWithParams returns a new instance of the software-based BCCSP
 // set at the passed security level, hash family and KeyStore.
+// TWGC todo
 func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 	// Init config
 	conf := &config{}
@@ -94,8 +95,8 @@ func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore
 	swbccsp.AddWrapper(reflect.TypeOf(&ecdsaPrivateKey{}), &ecdsaPrivateKeyKeyDeriver{})
 	swbccsp.AddWrapper(reflect.TypeOf(&ecdsaPublicKey{}), &ecdsaPublicKeyKeyDeriver{})
 	swbccsp.AddWrapper(reflect.TypeOf(&aesPrivateKey{}), &aesPrivateKeyKeyDeriver{conf: conf})
-	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKey{}), &sm2PrivateKeyKeyDeriver{})
-	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PublicKey{}), &sm2PublicKeyKeyDeriver{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKey{}), &sm2.SM2PrivateKeyKeyDeriver{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PublicKey{}), &sm2.SM2PublicKeyKeyDeriver{})
 
 	// Set the key importers
 	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.AES256ImportKeyOpts{}), &aes256ImportKeyOptsKeyImporter{})
