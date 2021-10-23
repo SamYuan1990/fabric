@@ -149,7 +149,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return &ecdsaPrivateKey{k}, nil
 		// TWGC todo
 		case *sm2.PrivateKey:
-			return &bccspsm2.SM2PrivateKey{key.(*sm2.PrivateKey)}, nil
+			return &bccspsm2.SM2PrivateKey{PrivKey: key.(*sm2.PrivateKey)}, nil
 		default:
 			return nil, errors.New("secret key type not recognized")
 		}
@@ -165,7 +165,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return &ecdsaPublicKey{k}, nil
 		// TWGC todo
 		case *sm2.PublicKey:
-			return &bccspsm2.SM2PublicKey{key.(*sm2.PublicKey)}, nil
+			return &bccspsm2.SM2PublicKey{PubKey: key.(*sm2.PublicKey)}, nil
 		default:
 			return nil, errors.New("public key type not recognized")
 		}
@@ -249,7 +249,7 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 			k = &ecdsaPrivateKey{kk}
 		// TWGC todo
 		case *sm2.PrivateKey:
-			k = &bccspsm2.SM2PrivateKey{key.(*sm2.PrivateKey)}
+			k = &bccspsm2.SM2PrivateKey{PrivKey: key.(*sm2.PrivateKey)}
 		default:
 			continue
 		}
