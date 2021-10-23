@@ -15,6 +15,7 @@ limitations under the License.
 */
 package sw
 
+// TWGC todo
 import (
 	"crypto/elliptic"
 	"crypto/sha256"

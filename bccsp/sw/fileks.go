@@ -145,11 +145,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		// go lang reflact...
 		case *ecdsa.PrivateKey:
 			return &ecdsaPrivateKey{k}, nil
-		// to do: move to gm package?
-		// make a map here, instead of switch
-		// at beginning, the map added with case and value(interface? by config?)
-		// and here is the k.type is xxx (in map)... by reg?
-		// to be poc test
+		// TWGC todo
 		case *sm2.PrivateKey:
 			return &sm2PrivateKey{key.(*sm2.PrivateKey)}, nil
 		default:
@@ -165,6 +161,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		switch k := key.(type) {
 		case *ecdsa.PublicKey:
 			return &ecdsaPublicKey{k}, nil
+		// TWGC todo
 		case *sm2.PublicKey:
 			return &sm2PublicKey{key.(*sm2.PublicKey)}, nil
 		default:
@@ -203,7 +200,7 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed storing AES key [%s]", err)
 		}
-
+	// TWGC todo
 	case *sm2PrivateKey:
 		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
 		if err != nil {
@@ -248,6 +245,7 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 		switch kk := key.(type) {
 		case *ecdsa.PrivateKey:
 			k = &ecdsaPrivateKey{kk}
+		// TWGC todo
 		case *sm2.PrivateKey:
 			k = &sm2PrivateKey{key.(*sm2.PrivateKey)}
 		default:

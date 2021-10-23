@@ -17,6 +17,7 @@ package sw
 
 import "hash"
 
+// TWGC todo
 type sm3sig struct {
 	msg []byte
 }

@@ -10,15 +10,15 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 
-	//"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
-	"github.com/Hyperledger-TWGC/ccs-gm/x509"
+	gmx509 "github.com/Hyperledger-TWGC/ccs-gm/x509"
 )
 
 type pkcs8Info struct {
@@ -54,6 +54,7 @@ func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 		return oidNamedCurveP384, true
 	case elliptic.P521():
 		return oidNamedCurveP521, true
+	// TWGC todo
 	case sm2.P256():
 		return oidNamedCurveSm2, true
 	}
@@ -66,9 +67,11 @@ func PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
 		return nil, errors.New("invalid ecdsa private key. It must be different from nil")
 	}
 	switch privateKey.(type) {
+	// TWGC todo
 	case *sm2.PrivateKey:
 		// reg
-		return x509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
+		// TJ pakcage
+		return gmx509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
 	case *ecdsa.PrivateKey:
 		return x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))
 	default:
@@ -129,6 +132,7 @@ func privateKeyToPEM(privateKey interface{}, pwd []byte) ([]byte, error) {
 				Bytes: pkcs8Bytes,
 			},
 		), nil
+	// TWGC todo
 	case *sm2.PrivateKey:
 		if k == nil {
 			return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
@@ -205,7 +209,7 @@ func privateKeyToEncryptedPEM(privateKey interface{}, pwd []byte) ([]byte, error
 		}
 
 		return pem.EncodeToMemory(block), nil
-
+	// TWGC todo
 	case *sm2.PrivateKey:
 		if k == nil {
 			return nil, errors.New("Invalid sm2 private key. It must be different from nil.")
@@ -370,7 +374,7 @@ func publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 				Bytes: PubASN1,
 			},
 		), nil
-
+	// TWGC todo
 	case *sm2.PublicKey:
 		if k == nil {
 			return nil, errors.New("Invalid ecdsa public key. It must be different from nil.")
@@ -415,7 +419,7 @@ func publicKeyToEncryptedPEM(publicKey interface{}, pwd []byte) ([]byte, error) 
 		}
 
 		return pem.EncodeToMemory(block), nil
-
+	// TWGC todo
 	case *sm2.PublicKey:
 		if k == nil {
 			return nil, errors.New("Invalid sm2 public key. It must be different from nil.")

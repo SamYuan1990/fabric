@@ -151,7 +151,7 @@ func (kd *aesPrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 	}
 }
 
-// to do package gm
+// TWGC todo
 type sm2PublicKeyKeyDeriver struct{}
 
 func (kd *sm2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
@@ -196,6 +196,7 @@ func (kd *sm2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 	}
 }
 
+// TWGC todo
 type sm2PrivateKeyKeyDeriver struct{}
 
 func (kd *sm2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {

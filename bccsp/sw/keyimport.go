@@ -116,7 +116,6 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &ecdsaPublicKey{lowLevelKey}, nil
 }
 
-// package gm
 type x509PublicKeyImportOptsKeyImporter struct {
 	bccsp *CSP
 }
@@ -126,6 +125,7 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	var pk interface{}
 	gmx509Cert, ok := raw.(*gmx509.Certificate)
 	if ok {
+		// TWGC todo
 		validated = true
 		pk = gmx509Cert.PublicKey
 	}
@@ -148,7 +148,7 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 		// This path only exists to support environments that use RSA certificate
 		// authorities to issue ECDSA certificates.
 		return &rsaPublicKey{pubKey: pk.(*rsa.PublicKey)}, nil
-	// todo:reg...
+	// TWGC todo
 	case *sm2.PublicKey:
 		return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{})].KeyImport(
 			pk.(*sm2.PublicKey), &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
@@ -157,6 +157,7 @@ func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	}
 }
 
+// TWGC todo
 type sm2PKIXPublicKeyImportOptsKeyImporter struct{}
 
 func (*sm2PKIXPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
@@ -183,6 +184,7 @@ func (*sm2PKIXPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &sm2PublicKey{sm2PK}, nil
 }
 
+// TWGC todo
 type sm2PrivateKeyImportOptsKeyImporter struct{}
 
 func (*sm2PrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
@@ -209,6 +211,7 @@ func (*sm2PrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp
 	return &sm2PrivateKey{sm2SK}, nil
 }
 
+// TWGC todo
 type sm2GoPublicKeyImportOptsKeyImporter struct{}
 
 func (*sm2GoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {

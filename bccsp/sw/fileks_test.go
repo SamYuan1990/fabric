@@ -138,3 +138,7 @@ func TestDirEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, false, r)
 }
+
+// TWGC todo
+// func GetKey test for sm2
+// func StoreKey test for sm2

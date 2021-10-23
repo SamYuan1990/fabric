@@ -53,7 +53,7 @@ func (kg *aesKeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
 	return &aesPrivateKey{lowLevelKey, false}, nil
 }
 
-// to do package gm
+// TWGC todo
 type sm2KeyGenerator struct {
 	curve elliptic.Curve
 }
