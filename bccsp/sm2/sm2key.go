@@ -19,7 +19,6 @@ package sm2
 import (
 	"crypto/elliptic"
 	"crypto/sha256"
-	"fmt"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"github.com/Hyperledger-TWGC/ccs-gm/x509"
@@ -30,8 +29,6 @@ type SM2PrivateKey struct {
 	PrivKey *sm2.PrivateKey
 }
 
-// Bytes converts this key to its byte representation,
-// if this operation is allowed.
 func (k *SM2PrivateKey) Bytes() (raw []byte, err error) {
 	return x509.MarshalECPrivateKey(k.PrivKey)
 }
@@ -83,12 +80,9 @@ type SM2PublicKey struct {
 
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
+
 func (k *SM2PublicKey) Bytes() (raw []byte, err error) {
 	raw, err = x509.MarshalPKIXPublicKey(k.PubKey)
-	if err != nil {
-		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
-	}
-	return
 }
 
 // SKI returns the subject key identifier of this key.
@@ -120,10 +114,10 @@ func (k *SM2PublicKey) Private() bool {
 
 // PublicKey returns the corresponding public key part of an asymmetric public/private key pair.
 // This method returns an error in symmetric key schemes.
-func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
-	return k, nil
-}
-
 func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
 	return k.PubKey
+}
+
+func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
+	return k, nil
 }
