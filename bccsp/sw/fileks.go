@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -176,50 +177,39 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 
 // StoreKey stores the key k in this KeyStore.
 // If this KeyStore is read only then the method will fail.
-func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
+func (ks *fileBasedKeyStore) StoreKey(key bccsp.Key) (err error) {
 	if ks.readOnly {
 		return errors.New("read only KeyStore")
 	}
 
-	if k == nil {
+	if key == nil {
 		return errors.New("invalid key. It must be different from nil")
 	}
-	switch kk := k.(type) {
-	case *ecdsaPrivateKey:
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
-		if err != nil {
-			return fmt.Errorf("failed storing ECDSA private key [%s]", err)
+	var m map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error
+	m = make(map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error)
+	m[reflect.TypeOf(&ecdsaPrivateKey{})] = PrivateKeyStore
+	m[reflect.TypeOf(&ecdsaPublicKey{})] = PubKeyStore
+	m[reflect.TypeOf(&aesPrivateKey{})] = StoreKey
+	for k, v := range m {
+		if k == reflect.TypeOf(key) {
+			return v(ks, key, key)
 		}
-
-	case *ecdsaPublicKey:
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
-		if err != nil {
-			return fmt.Errorf("failed storing ECDSA public key [%s]", err)
-		}
-
-	case *aesPrivateKey:
-		err = ks.storeKey(hex.EncodeToString(k.SKI()), kk.privKey)
-		if err != nil {
-			return fmt.Errorf("failed storing AES key [%s]", err)
-		}
-	// TWGC todo
-	case *bccspsm2.SM2PrivateKey:
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.PrivKey)
-		if err != nil {
-			return fmt.Errorf("Failed storing SM2 private key [%s]", err)
-		}
-
-	case *bccspsm2.SM2PublicKey:
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.PubKey)
-		if err != nil {
-			return fmt.Errorf("Failed storing SM2 public key [%s]", err)
-		}
-
-	default:
-		return fmt.Errorf("key type not reconigned [%s]", k)
 	}
+	/*
+		// TWGC todo
+		case *bccspsm2.SM2PrivateKey:
+			err = ks.storePrivateKey(hex.EncodeToString(key.SKI()), kk.PrivKey)
+			if err != nil {
+				return fmt.Errorf("Failed storing SM2 private key [%s]", err)
+			}
 
-	return
+		case *bccspsm2.SM2PublicKey:
+			err = ks.storePublicKey(hex.EncodeToString(key.SKI()), kk.PubKey)
+			if err != nil {
+				return fmt.Errorf("Failed storing SM2 public key [%s]", err)
+			}
+	*/
+	return fmt.Errorf("key type not reconigned [%s]", key)
 }
 
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {
@@ -444,4 +434,58 @@ func dirEmpty(path string) (bool, error) {
 		return true, nil
 	}
 	return false, err
+}
+
+func PrivateKeyStore(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := privateKeyToPEM(privateKey.(*ecdsaPrivateKey).privKey, ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing private key [%s]", err)
+	}
+	return err
+}
+
+func PubKeyStore(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := publicKeyToPEM(publicKey.(*ecdsaPublicKey).pubKey, ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing public key [%s]", err)
+	}
+	return err
+}
+
+func StoreKey(ks *fileBasedKeyStore, k bccsp.Key, key interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	pem, err := aesToEncryptedPEM(key.(*aesPrivateKey).privKey, ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "key"), pem, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing key [%s]: [%s]", alias, err)
+		return err
+	}
+
+	return nil
 }
