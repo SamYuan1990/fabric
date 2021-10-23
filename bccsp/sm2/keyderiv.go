@@ -30,21 +30,21 @@ func (kd *SM2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 	case *bccsp.SM2ReRandKeyOpts:
 		reRandOpts := opts.(*bccsp.SM2ReRandKeyOpts)
 		tempSK := &sm2.PublicKey{
-			Curve: sm2K.PubKey.Curve,
+			Curve: sm2K.GetPubKey().Curve,
 			X:     new(big.Int),
 			Y:     new(big.Int),
 		}
 
 		var k = new(big.Int).SetBytes(reRandOpts.ExpansionValue())
 		var one = new(big.Int).SetInt64(1)
-		n := new(big.Int).Sub(sm2K.PubKey.Params().N, one)
+		n := new(big.Int).Sub(sm2K.GetPubKey().Params().N, one)
 		k.Mod(k, n)
 		k.Add(k, one)
 
 		// Compute temporary public key
-		tempX, tempY := sm2K.PubKey.ScalarBaseMult(k.Bytes())
+		tempX, tempY := sm2K.GetPubKey().ScalarBaseMult(k.Bytes())
 		tempSK.X, tempSK.Y = tempSK.Add(
-			sm2K.PubKey.X, sm2K.PubKey.Y,
+			sm2K.GetPubKey().X, sm2K.GetPubKey().Y,
 			tempX, tempY,
 		)
 

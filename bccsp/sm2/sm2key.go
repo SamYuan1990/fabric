@@ -69,6 +69,10 @@ func (k *SM2PrivateKey) PublicKey() (bccsp.Key, error) {
 	return &SM2PublicKey{&k.PrivKey.PublicKey}, nil
 }
 
+func (k *SM2PrivateKey) GetPrivKey() *sm2.PrivateKey {
+	return k.PrivKey
+}
+
 func NewSm2PrivateKey(privKey *sm2.PrivateKey) *SM2PrivateKey {
 	return &SM2PrivateKey{privKey}
 }
@@ -118,4 +122,8 @@ func (k *SM2PublicKey) Private() bool {
 // This method returns an error in symmetric key schemes.
 func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
 	return k, nil
+}
+
+func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
+	return k.PubKey
 }
