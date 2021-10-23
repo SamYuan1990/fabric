@@ -22,6 +22,8 @@ import (
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/hyperledger/fabric/bccsp"
+
+	bccspsm2 "github.com/hyperledger/fabric/bccsp/sm2"
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
@@ -147,7 +149,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return &ecdsaPrivateKey{k}, nil
 		// TWGC todo
 		case *sm2.PrivateKey:
-			return &sm2PrivateKey{key.(*sm2.PrivateKey)}, nil
+			return &bccspsm2.SM2PrivateKey{key.(*sm2.PrivateKey)}, nil
 		default:
 			return nil, errors.New("secret key type not recognized")
 		}
@@ -163,7 +165,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return &ecdsaPublicKey{k}, nil
 		// TWGC todo
 		case *sm2.PublicKey:
-			return &sm2PublicKey{key.(*sm2.PublicKey)}, nil
+			return &bccspsm2.SM2PublicKey{key.(*sm2.PublicKey)}, nil
 		default:
 			return nil, errors.New("public key type not recognized")
 		}
@@ -201,14 +203,14 @@ func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
 			return fmt.Errorf("failed storing AES key [%s]", err)
 		}
 	// TWGC todo
-	case *sm2PrivateKey:
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
+	case *bccspsm2.SM2PrivateKey:
+		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.PrivKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing SM2 private key [%s]", err)
 		}
 
-	case *sm2PublicKey:
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
+	case *bccspsm2.SM2PublicKey:
+		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.PubKey)
 		if err != nil {
 			return fmt.Errorf("Failed storing SM2 public key [%s]", err)
 		}
@@ -247,7 +249,7 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 			k = &ecdsaPrivateKey{kk}
 		// TWGC todo
 		case *sm2.PrivateKey:
-			k = &sm2PrivateKey{key.(*sm2.PrivateKey)}
+			k = &bccspsm2.SM2PrivateKey{key.(*sm2.PrivateKey)}
 		default:
 			continue
 		}

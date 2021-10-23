@@ -26,6 +26,8 @@ import (
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/hyperledger/fabric/bccsp"
+
+	bccspsm2 "github.com/hyperledger/fabric/bccsp/sm2"
 )
 
 type ecdsaPublicKeyKeyDeriver struct{}
@@ -160,28 +162,28 @@ func (kd *sm2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 		return nil, errors.New("Invalid opts parameter. It must not be nil.")
 	}
 
-	sm2K := k.(*sm2PublicKey)
+	sm2K := k.(*bccspsm2.SM2PublicKey)
 
 	switch opts.(type) {
 	// Re-randomized an SM2 public key
 	case *bccsp.SM2ReRandKeyOpts:
 		reRandOpts := opts.(*bccsp.SM2ReRandKeyOpts)
 		tempSK := &sm2.PublicKey{
-			Curve: sm2K.pubKey.Curve,
+			Curve: sm2K.PubKey.Curve,
 			X:     new(big.Int),
 			Y:     new(big.Int),
 		}
 
 		var k = new(big.Int).SetBytes(reRandOpts.ExpansionValue())
 		var one = new(big.Int).SetInt64(1)
-		n := new(big.Int).Sub(sm2K.pubKey.Params().N, one)
+		n := new(big.Int).Sub(sm2K.PubKey.Params().N, one)
 		k.Mod(k, n)
 		k.Add(k, one)
 
 		// Compute temporary public key
-		tempX, tempY := sm2K.pubKey.ScalarBaseMult(k.Bytes())
+		tempX, tempY := sm2K.PubKey.ScalarBaseMult(k.Bytes())
 		tempSK.X, tempSK.Y = tempSK.Add(
-			sm2K.pubKey.X, sm2K.pubKey.Y,
+			sm2K.PubKey.X, sm2K.PubKey.Y,
 			tempX, tempY,
 		)
 
@@ -190,7 +192,7 @@ func (kd *sm2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 		if !isOn {
 			return nil, errors.New("Failed temporary public key IsOnCurve check.")
 		}
-		return &sm2PublicKey{tempSK}, nil
+		return &bccspsm2.SM2PublicKey{tempSK}, nil
 	default:
 		return nil, fmt.Errorf("Unsupported 'KeyDerivOpts' provided [%v]", opts)
 	}
@@ -205,7 +207,7 @@ func (kd *sm2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 		return nil, errors.New("Invalid opts parameter. It must not be nil.")
 	}
 
-	sm2K := k.(*sm2PrivateKey)
+	sm2K := k.(*bccspsm2.SM2PrivateKey)
 
 	switch opts.(type) {
 	// Re-randomized an ECDSA private key
@@ -213,7 +215,7 @@ func (kd *sm2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 		reRandOpts := opts.(*bccsp.SM2ReRandKeyOpts)
 		tempSK := &sm2.PrivateKey{
 			PublicKey: sm2.PublicKey{
-				Curve: sm2K.privKey.Curve,
+				Curve: sm2K.PrivKey.Curve,
 				X:     new(big.Int),
 				Y:     new(big.Int),
 			},
@@ -222,18 +224,18 @@ func (kd *sm2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 
 		var k = new(big.Int).SetBytes(reRandOpts.ExpansionValue())
 		var one = new(big.Int).SetInt64(1)
-		n := new(big.Int).Sub(sm2K.privKey.Params().N, one)
+		n := new(big.Int).Sub(sm2K.PrivKey.Params().N, one)
 		k.Mod(k, n)
 		k.Add(k, one)
 
-		tempSK.D.Add(sm2K.privKey.D, k)
-		tempSK.D.Mod(tempSK.D, sm2K.privKey.PublicKey.Params().N)
+		tempSK.D.Add(sm2K.PrivKey.D, k)
+		tempSK.D.Mod(tempSK.D, sm2K.PrivKey.PublicKey.Params().N)
 
 		// Compute temporary public key
-		tempX, tempY := sm2K.privKey.PublicKey.ScalarBaseMult(k.Bytes())
+		tempX, tempY := sm2K.PrivKey.PublicKey.ScalarBaseMult(k.Bytes())
 		tempSK.PublicKey.X, tempSK.PublicKey.Y =
 			tempSK.PublicKey.Add(
-				sm2K.privKey.PublicKey.X, sm2K.privKey.PublicKey.Y,
+				sm2K.PrivKey.PublicKey.X, sm2K.PrivKey.PublicKey.Y,
 				tempX, tempY,
 			)
 
@@ -242,7 +244,7 @@ func (kd *sm2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 		if !isOn {
 			return nil, errors.New("Failed temporary public key IsOnCurve check.")
 		}
-		return &sm2PrivateKey{tempSK}, nil
+		return &bccspsm2.SM2PrivateKey{tempSK}, nil
 	default:
 		return nil, fmt.Errorf("Unsupported 'KeyDerivOpts' provided [%v]", opts)
 	}
