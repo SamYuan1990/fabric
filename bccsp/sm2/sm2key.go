@@ -121,3 +121,7 @@ func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
 func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
 	return k, nil
 }
+
+func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
+	return k.PubKey
+}
