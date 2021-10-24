@@ -11,6 +11,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"reflect"
 
 	"encoding/asn1"
 	"encoding/pem"
@@ -66,15 +67,26 @@ func PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errors.New("invalid ecdsa private key. It must be different from nil")
 	}
-	switch privateKey.(type) {
 	// TWGC todo
-	case *sm2.PrivateKey:
-		return gmx509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
-	case *ecdsa.PrivateKey:
-		return x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))
-	default:
-		return nil, errors.New("Failed to recognize the privatekey")
+	// make this map as global variable
+	var m map[reflect.Type]func(interface{}) ([]byte, error)
+	m = make(map[reflect.Type]func(interface{}) ([]byte, error))
+	m[reflect.TypeOf(&sm2.PrivateKey{})] = SM2PrivateKeyToDER
+	m[reflect.TypeOf(&ecdsa.PrivateKey{})] = ECDSAPrivateKeyToDER
+	for k, v := range m {
+		if k == reflect.TypeOf(privateKey) {
+			return v(privateKey)
+		}
 	}
+	return nil, errors.New("Failed to recognize the privatekey")
+}
+
+func SM2PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
+	return gmx509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
+}
+
+func ECDSAPrivateKeyToDER(privateKey interface{}) ([]byte, error) {
+	return x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))
 }
 
 func privateKeyToPEM(privateKey interface{}, pwd []byte) ([]byte, error) {
@@ -395,54 +407,64 @@ func publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 }
 
 func publicKeyToEncryptedPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
-	switch k := publicKey.(type) {
-	case *ecdsa.PublicKey:
-		if k == nil {
-			return nil, errors.New("invalid ecdsa public key. It must be different from nil")
-		}
-		raw, err := x509.MarshalPKIXPublicKey(k)
-		if err != nil {
-			return nil, err
-		}
-
-		block, err := x509.EncryptPEMBlock(
-			rand.Reader,
-			"PUBLIC KEY",
-			raw,
-			pwd,
-			x509.PEMCipherAES256)
-
-		if err != nil {
-			return nil, err
-		}
-
-		return pem.EncodeToMemory(block), nil
 	// TWGC todo
-	case *sm2.PublicKey:
-		if k == nil {
-			return nil, errors.New("Invalid sm2 public key. It must be different from nil.")
+	// make this map as global variable
+	var m map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
+	m = make(map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error))
+	m[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSApublicKeyToEncryptedPEM
+	m[reflect.TypeOf(&sm2.PublicKey{})] = SM2publicKeyToEncryptedPEM
+	for k, v := range m {
+		if k == reflect.TypeOf(publicKey) {
+			return v(publicKey, pwd)
 		}
-		raw, err := x509.MarshalPKIXPublicKey(k)
-		if err != nil {
-			return nil, err
-		}
-
-		block, err := x509.EncryptPEMBlock(
-			rand.Reader,
-			"PUBLIC KEY",
-			raw,
-			pwd,
-			x509.PEMCipherAES256)
-
-		if err != nil {
-			return nil, err
-		}
-
-		return pem.EncodeToMemory(block), nil
-
-	default:
-		return nil, errors.New("invalid key type. It must be *ecdsa.PublicKey")
 	}
+	return nil, errors.New("invalid key type.")
+}
+
+func SM2publicKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
+	if k.(*sm2.PublicKey) == nil {
+		return nil, errors.New("Invalid sm2 public key. It must be different from nil.")
+	}
+	raw, err := x509.MarshalPKIXPublicKey(k)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := x509.EncryptPEMBlock(
+		rand.Reader,
+		"PUBLIC KEY",
+		raw,
+		pwd,
+		x509.PEMCipherAES256)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(block), nil
+}
+
+func ECDSApublicKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
+	if k.(*ecdsa.PublicKey) == nil {
+		return nil, errors.New("invalid ecdsa public key. It must be different from nil")
+	}
+	raw, err := x509.MarshalPKIXPublicKey(k)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := x509.EncryptPEMBlock(
+		rand.Reader,
+		"PUBLIC KEY",
+		raw,
+		pwd,
+		x509.PEMCipherAES256)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(block), nil
 }
 
 func pemToPublicKey(raw []byte, pwd []byte) (interface{}, error) {
