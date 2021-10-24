@@ -155,15 +155,6 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 				return v(key), nil
 			}
 		}
-		/*switch k := key.(type) {
-		// go lang reflact...
-		case *ecdsa.PrivateKey:
-			return NewECDSAPrivateKey(k), nil
-		// TWGC todo
-		case *sm2.PrivateKey:
-			return NewSM2PrivateKey(k), nil
-		default:
-		*/
 		return nil, errors.New("secret key type not recognized")
 	case "pk":
 		// Load the public key
@@ -182,15 +173,6 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 				return v(key), nil
 			}
 		}
-		/*switch k := key.(type) {
-		case *ecdsa.PublicKey:
-			return NewECDSAPubKey(k), nil
-		// TWGC todo
-		case *sm2.PublicKey:
-			return NewSM2PubKey(k), nil
-		default:
-			return nil, errors.New("public key type not recognized")
-		}*/
 		return nil, errors.New("public key type not recognized")
 	default:
 		return ks.searchKeystoreForSKI(ski)
@@ -261,16 +243,6 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 		if f_continue {
 			continue
 		}
-		/*switch kk := key.(type) {
-		case *ecdsa.PrivateKey:
-			k = NewECDSAPrivateKey(kk)
-		// TWGC todo
-		case *sm2.PrivateKey:
-			k = NewSM2PrivateKey(kk)
-		default:
-			continue
-		}*/
-
 		if !bytes.Equal(k.SKI(), ski) {
 			continue
 		}

@@ -69,8 +69,6 @@ func PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
 	switch privateKey.(type) {
 	// TWGC todo
 	case *sm2.PrivateKey:
-		// reg
-		// TJ pakcage
 		return gmx509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
 	case *ecdsa.PrivateKey:
 		return x509.MarshalECPrivateKey(privateKey.(*ecdsa.PrivateKey))
