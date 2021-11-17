@@ -15,10 +15,14 @@ limitations under the License.
 */
 package sm2
 
-// TWGC todo
 import (
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/asn1"
+	"encoding/pem"
+	"errors"
+	"fmt"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 	"github.com/Hyperledger-TWGC/ccs-gm/x509"
@@ -124,4 +128,107 @@ func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
 
 func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
 	return k.PubKey
+}
+
+func SM2publicKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
+	if k.(*sm2.PublicKey) == nil {
+		return nil, errors.New("Invalid sm2 public key. It must be different from nil.")
+	}
+	raw, err := x509.MarshalPKIXPublicKey(k)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := x509.EncryptPEMBlock(
+		rand.Reader,
+		"PUBLIC KEY",
+		raw,
+		pwd,
+		x509.PEMCipherAES256)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(block), nil
+}
+
+func SM2PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
+	return x509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
+}
+
+func SM2privateKeyToPEM(k interface{}, pwd []byte) ([]byte, error) {
+	if k.(*sm2.PrivateKey) == nil {
+		return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
+	}
+
+	// get the oid for the curve
+	oidNamedCurve, ok := oidFromNamedCurve(k.(*sm2.PrivateKey).Curve)
+	if !ok {
+		return nil, errors.New("unknown elliptic curve")
+	}
+
+	// based on https://golang.org/src/crypto/x509/sec1.go
+	privateKeyBytes := k.(*sm2.PrivateKey).D.Bytes()
+	paddedPrivateKey := make([]byte, (k.(*sm2.PrivateKey).Curve.Params().N.BitLen()+7)/8)
+	copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
+	// omit NamedCurveOID for compatibility as it's optional
+	asn1Bytes, err := asn1.Marshal(ecPrivateKey{
+		Version:    1,
+		PrivateKey: paddedPrivateKey,
+		PublicKey:  asn1.BitString{Bytes: elliptic.Marshal(k.(*sm2.PrivateKey).Curve, k.(*sm2.PrivateKey).X, k.(*sm2.PrivateKey).Y)},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling SM2 key to asn1 [%s]", err)
+	}
+
+	var pkcs8Key pkcs8Info
+	pkcs8Key.Version = 0
+	pkcs8Key.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 2)
+	pkcs8Key.PrivateKeyAlgorithm[0] = oidPublicKeyECDSA
+	pkcs8Key.PrivateKeyAlgorithm[1] = oidNamedCurve
+	pkcs8Key.PrivateKey = asn1Bytes
+
+	pkcs8Bytes, err := asn1.Marshal(pkcs8Key)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling EC key to asn1 [%s]", err)
+	}
+	return pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "PRIVATE KEY",
+			Bytes: pkcs8Bytes,
+		},
+	), nil
+}
+
+func SM2privateKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
+	if k.(*sm2.PrivateKey) == nil {
+		return nil, errors.New("Invalid sm2 private key. It must be different from nil.")
+	}
+	oid := oidNamedCurveSm2
+	privateKeyBytes := k.(*sm2.PrivateKey).D.Bytes()
+	paddedPrivateKey := make([]byte, (k.(*sm2.PrivateKey).Curve.Params().N.BitLen()+7)/8)
+	copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
+	raw, err := asn1.Marshal(ecPrivateKey{
+		Version:       1,
+		PrivateKey:    paddedPrivateKey,
+		NamedCurveOID: oid,
+		PublicKey:     asn1.BitString{Bytes: elliptic.Marshal(k.(*sm2.PrivateKey).Curve, k.(*sm2.PrivateKey).X, k.(*sm2.PrivateKey).Y)},
+	})
+	if err != nil {
+		return nil, err
+	}
+	block, err := x509.EncryptPEMBlock(
+		rand.Reader,
+		"PRIVATE KEY",
+		raw,
+		pwd,
+		x509.PEMCipherAES256)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(block), nil
 }

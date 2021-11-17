@@ -17,7 +17,6 @@ package sm2
 
 import "hash"
 
-// TWGC todo
 type SM3sig struct {
 	msg []byte
 }

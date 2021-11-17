@@ -14,7 +14,6 @@ import (
 	"github.com/hyperledger/fabric/bccsp"
 )
 
-// TWGC todo
 type SM2PublicKeyKeyDeriver struct{}
 
 func (kd *SM2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
@@ -59,7 +58,6 @@ func (kd *SM2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 	}
 }
 
-// TWGC todo
 type SM2PrivateKeyKeyDeriver struct{}
 
 func (kd *SM2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
