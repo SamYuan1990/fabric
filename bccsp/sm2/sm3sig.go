@@ -13,24 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package sw
+package sm2
 
 import "hash"
 
-type sm3sig struct {
+// TWGC todo
+type SM3sig struct {
 	msg []byte
 }
 
 func NewSM3Sig() hash.Hash {
-	return &sm3sig{}
+	return &SM3sig{}
 }
 
-func (d *sm3sig) Write(p []byte) (n int, err error) {
+func (d *SM3sig) Write(p []byte) (n int, err error) {
 	d.msg = append(d.msg, p...)
 	return len(d.msg), nil
 }
 
-func (d *sm3sig) Sum(b []byte) []byte {
+func (d *SM3sig) Sum(b []byte) []byte {
 	if b != nil {
 		panic("sm3sig fail: b must be nil")
 	}
@@ -38,14 +39,14 @@ func (d *sm3sig) Sum(b []byte) []byte {
 	return d.msg
 }
 
-func (d *sm3sig) Reset() {
+func (d *SM3sig) Reset() {
 	d.msg = d.msg[:0]
 }
 
-func (d *sm3sig) Size() int {
+func (d *SM3sig) Size() int {
 	return 0
 }
 
-func (d *sm3sig) BlockSize() int {
+func (d *SM3sig) BlockSize() int {
 	return 0
 }

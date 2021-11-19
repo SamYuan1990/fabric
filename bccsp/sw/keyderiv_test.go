@@ -100,3 +100,7 @@ func TestAESPrivateKeyKeyDeriver(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unsupported 'KeyDerivOpts' provided [")
 }
+
+// TWGC todo
+// func sm2PublicKeyKeyDeriver
+// func sm2PrivateKeyKeyDeriver

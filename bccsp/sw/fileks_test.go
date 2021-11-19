@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	bccspsm2 "github.com/hyperledger/fabric/bccsp/sm2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,6 +43,16 @@ func TestInvalidStoreKey(t *testing.T) {
 	}
 
 	err = ks.StoreKey(&ecdsaPublicKey{nil})
+	if err == nil {
+		t.Fatal("Error should be different from nil in this case")
+	}
+
+	err = ks.StoreKey(&bccspsm2.SM2PrivateKey{PrivKey: nil})
+	if err == nil {
+		t.Fatal("Error should be different from nil in this case")
+	}
+
+	err = ks.StoreKey(&bccspsm2.SM2PublicKey{PubKey: nil})
 	if err == nil {
 		t.Fatal("Error should be different from nil in this case")
 	}
@@ -138,3 +149,6 @@ func TestDirEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, false, r)
 }
+
+// TWGC todo
+// func GetKey test for sm2

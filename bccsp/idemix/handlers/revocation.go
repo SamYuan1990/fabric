@@ -9,11 +9,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"reflect"
 
-	"github.com/Hyperledger-TWGC/ccs-gm/x509"
+	//"github.com/Hyperledger-TWGC/ccs-gm/x509"
 
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
@@ -82,6 +83,7 @@ func NewRevocationPublicKey(pubKey *ecdsa.PublicKey) *revocationPublicKey {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *revocationPublicKey) Bytes() (raw []byte, err error) {
+	// TWGC todo
 	raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
 	if err != nil {
 		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
@@ -155,7 +157,7 @@ func (i *RevocationPublicKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyI
 	if blockPub == nil {
 		return nil, errors.New("Failed to decode revocation ECDSA public key")
 	}
-	// to do here, replace x509.ParsePKIXPublicKey into a key import function?
+	// TWGC todo
 	revocationPk, err := x509.ParsePKIXPublicKey(blockPub.Bytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to parse revocation ECDSA public key bytes")

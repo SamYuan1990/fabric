@@ -16,12 +16,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 
 	"github.com/hyperledger/fabric/bccsp"
+
+	bccspsm2 "github.com/hyperledger/fabric/bccsp/sm2"
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
@@ -141,35 +144,36 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return nil, fmt.Errorf("failed loading secret key [%x] [%s]", ski, err)
 		}
 
-		switch k := key.(type) {
-		// go lang reflact...
-		case *ecdsa.PrivateKey:
-			return &ecdsaPrivateKey{k}, nil
-		// to do: move to gm package?
-		// make a map here, instead of switch
-		// at beginning, the map added with case and value(interface? by config?)
-		// and here is the k.type is xxx (in map)... by reg?
-		// to be poc test
-		case *sm2.PrivateKey:
-			return &sm2PrivateKey{key.(*sm2.PrivateKey)}, nil
-		default:
-			return nil, errors.New("secret key type not recognized")
+		// TWGC todo
+		// make this map as global variable
+		var m map[reflect.Type]func(interface{}) bccsp.Key
+		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
+		m[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
+		m[reflect.TypeOf(&sm2.PrivateKey{})] = NewSM2PrivateKey
+		for i, v := range m {
+			if i == reflect.TypeOf(key) {
+				return v(key), nil
+			}
 		}
+		return nil, errors.New("secret key type not recognized")
 	case "pk":
 		// Load the public key
 		key, err := ks.loadPublicKey(hex.EncodeToString(ski))
 		if err != nil {
 			return nil, fmt.Errorf("failed loading public key [%x] [%s]", ski, err)
 		}
-
-		switch k := key.(type) {
-		case *ecdsa.PublicKey:
-			return &ecdsaPublicKey{k}, nil
-		case *sm2.PublicKey:
-			return &sm2PublicKey{key.(*sm2.PublicKey)}, nil
-		default:
-			return nil, errors.New("public key type not recognized")
+		// TWGC todo
+		// make this map as global variable
+		var m map[reflect.Type]func(interface{}) bccsp.Key
+		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
+		m[reflect.TypeOf(&ecdsa.PublicKey{})] = NewECDSAPubKey
+		m[reflect.TypeOf(&sm2.PublicKey{})] = NewSM2PubKey
+		for i, v := range m {
+			if i == reflect.TypeOf(key) {
+				return v(key), nil
+			}
 		}
+		return nil, errors.New("public key type not recognized")
 	default:
 		return ks.searchKeystoreForSKI(ski)
 	}
@@ -177,50 +181,29 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 
 // StoreKey stores the key k in this KeyStore.
 // If this KeyStore is read only then the method will fail.
-func (ks *fileBasedKeyStore) StoreKey(k bccsp.Key) (err error) {
+func (ks *fileBasedKeyStore) StoreKey(key bccsp.Key) (err error) {
 	if ks.readOnly {
 		return errors.New("read only KeyStore")
 	}
 
-	if k == nil {
+	if key == nil {
 		return errors.New("invalid key. It must be different from nil")
 	}
-	switch kk := k.(type) {
-	case *ecdsaPrivateKey:
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
-		if err != nil {
-			return fmt.Errorf("failed storing ECDSA private key [%s]", err)
+	// TWGC todo
+	// make this map as global var
+	var m map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error
+	m = make(map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error)
+	m[reflect.TypeOf(&ecdsaPrivateKey{})] = PrivateKeyStore
+	m[reflect.TypeOf(&ecdsaPublicKey{})] = PubKeyStore
+	m[reflect.TypeOf(&aesPrivateKey{})] = StoreKey
+	m[reflect.TypeOf(&bccspsm2.SM2PrivateKey{})] = PrivateKeyStoreSM2
+	m[reflect.TypeOf(&bccspsm2.SM2PublicKey{})] = PubKeyStoreSM2
+	for k, v := range m {
+		if k == reflect.TypeOf(key) {
+			return v(ks, key, key)
 		}
-
-	case *ecdsaPublicKey:
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
-		if err != nil {
-			return fmt.Errorf("failed storing ECDSA public key [%s]", err)
-		}
-
-	case *aesPrivateKey:
-		err = ks.storeKey(hex.EncodeToString(k.SKI()), kk.privKey)
-		if err != nil {
-			return fmt.Errorf("failed storing AES key [%s]", err)
-		}
-
-	case *sm2PrivateKey:
-		err = ks.storePrivateKey(hex.EncodeToString(k.SKI()), kk.privKey)
-		if err != nil {
-			return fmt.Errorf("Failed storing SM2 private key [%s]", err)
-		}
-
-	case *sm2PublicKey:
-		err = ks.storePublicKey(hex.EncodeToString(k.SKI()), kk.pubKey)
-		if err != nil {
-			return fmt.Errorf("Failed storing SM2 public key [%s]", err)
-		}
-
-	default:
-		return fmt.Errorf("key type not reconigned [%s]", k)
 	}
-
-	return
+	return fmt.Errorf("key type not reconigned [%s]", key)
 }
 
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {
@@ -244,16 +227,22 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 		if err != nil {
 			continue
 		}
-
-		switch kk := key.(type) {
-		case *ecdsa.PrivateKey:
-			k = &ecdsaPrivateKey{kk}
-		case *sm2.PrivateKey:
-			k = &sm2PrivateKey{key.(*sm2.PrivateKey)}
-		default:
+		// TWGC todo
+		// make this map as global variable
+		var m map[reflect.Type]func(interface{}) bccsp.Key
+		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
+		m[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
+		m[reflect.TypeOf(&sm2.PrivateKey{})] = NewSM2PrivateKey
+		f_continue := true
+		for i, v := range m {
+			if i == reflect.TypeOf(key) {
+				k = v(key)
+				f_continue = false
+			}
+		}
+		if f_continue {
 			continue
 		}
-
 		if !bytes.Equal(k.SKI(), ski) {
 			continue
 		}
@@ -444,4 +433,111 @@ func dirEmpty(path string) (bool, error) {
 		return true, nil
 	}
 	return false, err
+}
+
+func PrivateKeyStore(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := privateKeyToPEM(privateKey.(*ecdsaPrivateKey).GetPrivKey(), ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing private key [%s]", err)
+	}
+	return err
+}
+
+func PrivateKeyStoreSM2(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := privateKeyToPEM(privateKey.(*bccspsm2.SM2PrivateKey).GetPrivKey(), ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing private key [%s]", err)
+	}
+	return err
+}
+
+func PubKeyStore(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := publicKeyToPEM(publicKey.(*ecdsaPublicKey).GetPubKey(), ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing public key [%s]", err)
+	}
+	return err
+}
+
+func PubKeyStoreSM2(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	rawKey, err := publicKeyToPEM(publicKey.(*bccspsm2.SM2PublicKey).GetPubKey(), ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("failed storing public key [%s]", err)
+	}
+	return err
+}
+
+func StoreKey(ks *fileBasedKeyStore, k bccsp.Key, key interface{}) error {
+	alias := hex.EncodeToString(k.SKI())
+	pem, err := aesToEncryptedPEM(key.(*aesPrivateKey).privKey, ks.pwd)
+	if err != nil {
+		logger.Errorf("Failed converting key to PEM [%s]: [%s]", alias, err)
+		return err
+	}
+
+	err = ioutil.WriteFile(ks.getPathForAlias(alias, "key"), pem, 0600)
+	if err != nil {
+		logger.Errorf("Failed storing key [%s]: [%s]", alias, err)
+		return err
+	}
+
+	return nil
+}
+
+func NewSM2PrivateKey(k interface{}) bccsp.Key {
+	return &bccspsm2.SM2PrivateKey{PrivKey: k.(*sm2.PrivateKey)}
+}
+
+func NewECDSAPrivateKey(k interface{}) bccsp.Key {
+	return &ecdsaPrivateKey{k.(*ecdsa.PrivateKey)}
+}
+
+func NewSM2PubKey(k interface{}) bccsp.Key {
+	return &bccspsm2.SM2PublicKey{PubKey: k.(*sm2.PublicKey)}
+}
+
+func NewECDSAPubKey(k interface{}) bccsp.Key {
+	return &ecdsaPublicKey{k.(*ecdsa.PublicKey)}
 }

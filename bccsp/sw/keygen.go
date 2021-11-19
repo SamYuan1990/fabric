@@ -22,8 +22,6 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
-
 	"github.com/hyperledger/fabric/bccsp"
 )
 
@@ -53,16 +51,4 @@ func (kg *aesKeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
 	return &aesPrivateKey{lowLevelKey, false}, nil
 }
 
-// to do package gm
-type sm2KeyGenerator struct {
-	curve elliptic.Curve
-}
-
-func (kg *sm2KeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
-	privKey, err := sm2.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("Failed generating sm2 key : [%s]", err)
-	}
-
-	return &sm2PrivateKey{privKey}, nil
-}
+// TWGC todo

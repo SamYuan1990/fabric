@@ -116,106 +116,64 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &ecdsaPublicKey{lowLevelKey}, nil
 }
 
-// package gm
 type x509PublicKeyImportOptsKeyImporter struct {
 	bccsp *CSP
 }
 
 func (ki *x509PublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	validated := false
 	var pk interface{}
-	gmx509Cert, ok := raw.(*gmx509.Certificate)
-	if ok {
-		validated = true
-		pk = gmx509Cert.PublicKey
+	// TWGC todo
+	// make this map as global variable
+	var m2 map[reflect.Type]func(interface{}) interface{}
+	m2 = make(map[reflect.Type]func(interface{}) interface{})
+	validate := false
+	m2[reflect.TypeOf(&gmx509.Certificate{})] = GMPublicKeyFromCert
+	m2[reflect.TypeOf(&x509.Certificate{})] = ECDSAPublicKeyFromCert
+	for k, v := range m2 {
+		if k == reflect.TypeOf(raw) {
+			validate = true
+			pk = v(raw)
+		}
 	}
-
-	x509Cert, ok := raw.(*x509.Certificate)
-	if ok {
-		validated = true
-		pk = x509Cert.PublicKey
-	}
-	if !validated {
+	if !validate {
 		return nil, errors.New("Invalid raw material. Expected *x509.Certificate in ECDSA or GM")
 	}
 
-	switch pk.(type) {
-	case *ecdsa.PublicKey:
-		return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.ECDSAGoPublicKeyImportOpts{})].KeyImport(
-			pk,
-			&bccsp.ECDSAGoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
-	case *rsa.PublicKey:
-		// This path only exists to support environments that use RSA certificate
-		// authorities to issue ECDSA certificates.
-		return &rsaPublicKey{pubKey: pk.(*rsa.PublicKey)}, nil
-	// todo:reg...
-	case *sm2.PublicKey:
-		return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{})].KeyImport(
-			pk.(*sm2.PublicKey), &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
-	default:
-		return nil, errors.New("Certificate's public key type not recognized. Supported keys: [ECDSA, RSA]")
+	// TWGC todo
+	// make this map as global variable
+	var m map[reflect.Type]func(ki *x509PublicKeyImportOptsKeyImporter, opts bccsp.KeyImportOpts, pk interface{}) (bccsp.Key, error)
+	m = make(map[reflect.Type]func(ki *x509PublicKeyImportOptsKeyImporter, opts bccsp.KeyImportOpts, pk interface{}) (bccsp.Key, error))
+	m[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSAPublicKeyImport
+	m[reflect.TypeOf(&rsa.PublicKey{})] = RSAPublicKeyImport
+	m[reflect.TypeOf(&sm2.PublicKey{})] = SM2PublicKeyImport
+	for i, v := range m {
+		if i == reflect.TypeOf(pk) {
+			return v(ki, opts, pk)
+		}
 	}
+
+	return nil, errors.New("Certificate's public key type not recognized. Supported keys: [ECDSA, RSA]")
 }
 
-type sm2PKIXPublicKeyImportOptsKeyImporter struct{}
-
-func (*sm2PKIXPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	der, ok := raw.([]byte)
-	if !ok {
-		return nil, errors.New("Invalid raw material. Expected byte array.")
-	}
-
-	if len(der) == 0 {
-		return nil, errors.New("Invalid raw. It must not be nil.")
-	}
-
-	//lowLevelKey, err := utils.DERToPublicKey(der)
-	lowLevelKey, err := derToPublicKey(der)
-	if err != nil {
-		return nil, fmt.Errorf("Failed converting PKIX to sm2 public key [%s]", err)
-	}
-
-	sm2PK, ok := lowLevelKey.(*sm2.PublicKey)
-	if !ok {
-		return nil, errors.New("Failed casting to sm2 public key. Invalid raw material.")
-	}
-
-	return &sm2PublicKey{sm2PK}, nil
+func RSAPublicKeyImport(ki *x509PublicKeyImportOptsKeyImporter, opts bccsp.KeyImportOpts, pk interface{}) (bccsp.Key, error) {
+	return &rsaPublicKey{pubKey: pk.(*rsa.PublicKey)}, nil
 }
 
-type sm2PrivateKeyImportOptsKeyImporter struct{}
-
-func (*sm2PrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	der, ok := raw.([]byte)
-	if !ok {
-		return nil, errors.New("[sm2DERPrivateKeyImportOpts] Invalid raw material. Expected byte array.")
-	}
-
-	if len(der) == 0 {
-		return nil, errors.New("[sm2DERPrivateKeyImportOpts] Invalid raw. It must not be nil.")
-	}
-
-	//lowLevelKey, err := utils.DERToPrivateKey(der)
-	lowLevelKey, err := derToPrivateKey(der)
-	if err != nil {
-		return nil, fmt.Errorf("Failed converting PKIX to sm2 public key [%s]", err)
-	}
-
-	sm2SK, ok := lowLevelKey.(*sm2.PrivateKey)
-	if !ok {
-		return nil, errors.New("Failed casting to sm2 private key. Invalid raw material.")
-	}
-
-	return &sm2PrivateKey{sm2SK}, nil
+func ECDSAPublicKeyImport(ki *x509PublicKeyImportOptsKeyImporter, opts bccsp.KeyImportOpts, pk interface{}) (bccsp.Key, error) {
+	return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.ECDSAGoPublicKeyImportOpts{})].KeyImport(
+		pk,
+		&bccsp.ECDSAGoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
 }
 
-type sm2GoPublicKeyImportOptsKeyImporter struct{}
+func SM2PublicKeyImport(ki *x509PublicKeyImportOptsKeyImporter, opts bccsp.KeyImportOpts, pk interface{}) (bccsp.Key, error) {
+	return ki.bccsp.KeyImporters[reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{})].KeyImport(
+		pk.(*sm2.PublicKey), &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()})
+}
 
-func (*sm2GoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	lowLevelKey, ok := raw.(*sm2.PublicKey)
-	if !ok {
-		return nil, errors.New("Invalid raw material. Expected *sm2.PublicKey.")
-	}
+func ECDSAPublicKeyFromCert(raw interface{}) interface{} {
+	return raw.(*x509.Certificate).PublicKey
+}
 
-	return &sm2PublicKey{lowLevelKey}, nil
+func GMPublicKeyFromCert(raw interface{}) interface{} {
+	return raw.(*gmx509.Certificate).PublicKey
 }
