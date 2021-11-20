@@ -179,7 +179,6 @@ func derToPrivateKey(der []byte) (key interface{}, err error) {
 		return key, nil
 	}
 
-	// TWGC todo
 	if key, err = x509.ParsePKCS8PrivateKey(der); err == nil {
 		switch key.(type) {
 		case *ecdsa.PrivateKey:

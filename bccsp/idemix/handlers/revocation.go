@@ -83,7 +83,8 @@ func NewRevocationPublicKey(pubKey *ecdsa.PublicKey) *revocationPublicKey {
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
 func (k *revocationPublicKey) Bytes() (raw []byte, err error) {
-	// TWGC todo
+	// TWGC won't do
+	// seems for ecdsa specific
 	raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
 	if err != nil {
 		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
@@ -157,7 +158,8 @@ func (i *RevocationPublicKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyI
 	if blockPub == nil {
 		return nil, errors.New("Failed to decode revocation ECDSA public key")
 	}
-	// TWGC todo
+	// TWGC won't do
+	// seems for ecdsa specific
 	revocationPk, err := x509.ParsePKIXPublicKey(blockPub.Bytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to parse revocation ECDSA public key bytes")

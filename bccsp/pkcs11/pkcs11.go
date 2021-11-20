@@ -85,6 +85,7 @@ func New(opts PKCS11Opts, keyStore bccsp.KeyStore, options ...Option) (bccsp.BCC
 		return nil, errors.Wrapf(err, "Failed initializing configuration")
 	}
 
+	// TWGC todo
 	swCSP, err := sw.NewWithParams(opts.SecLevel, opts.HashFamily, keyStore)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed initializing fallback SW BCCSP")

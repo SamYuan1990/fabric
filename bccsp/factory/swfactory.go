@@ -58,6 +58,7 @@ func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 		ks = sw.NewDummyKeyStore()
 	}
 
+	// TWGC todo
 	return sw.NewWithParams(swOpts.SecLevel, swOpts.HashFamily, ks)
 }
 
