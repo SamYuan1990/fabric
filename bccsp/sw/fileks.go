@@ -20,11 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
-
 	"github.com/hyperledger/fabric/bccsp"
-
-	bccspsm2 "github.com/hyperledger/fabric/bccsp/sm2"
 )
 
 // NewFileBasedKeyStore instantiated a file-based key store at a given position.
@@ -144,13 +140,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 			return nil, fmt.Errorf("failed loading secret key [%x] [%s]", ski, err)
 		}
 
-		// TWGC todo
-		// make this map as global variable
-		var m map[reflect.Type]func(interface{}) bccsp.Key
-		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
-		m[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
-		m[reflect.TypeOf(&sm2.PrivateKey{})] = NewSM2PrivateKey
-		for i, v := range m {
+		for i, v := range GetNewprik() {
 			if i == reflect.TypeOf(key) {
 				return v(key), nil
 			}
@@ -162,13 +152,7 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed loading public key [%x] [%s]", ski, err)
 		}
-		// TWGC todo
-		// make this map as global variable
-		var m map[reflect.Type]func(interface{}) bccsp.Key
-		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
-		m[reflect.TypeOf(&ecdsa.PublicKey{})] = NewECDSAPubKey
-		m[reflect.TypeOf(&sm2.PublicKey{})] = NewSM2PubKey
-		for i, v := range m {
+		for i, v := range GetNewpk() {
 			if i == reflect.TypeOf(key) {
 				return v(key), nil
 			}
@@ -189,20 +173,17 @@ func (ks *fileBasedKeyStore) StoreKey(key bccsp.Key) (err error) {
 	if key == nil {
 		return errors.New("invalid key. It must be different from nil")
 	}
-	// TWGC todo
-	// make this map as global var
-	var m map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error
-	m = make(map[reflect.Type]func(ks *fileBasedKeyStore, k bccsp.Key, kk interface{}) error)
-	m[reflect.TypeOf(&ecdsaPrivateKey{})] = PrivateKeyStore
-	m[reflect.TypeOf(&ecdsaPublicKey{})] = PubKeyStore
-	m[reflect.TypeOf(&aesPrivateKey{})] = StoreKey
-	m[reflect.TypeOf(&bccspsm2.SM2PrivateKey{})] = PrivateKeyStoreSM2
-	m[reflect.TypeOf(&bccspsm2.SM2PublicKey{})] = PubKeyStoreSM2
-	for k, v := range m {
-		if k == reflect.TypeOf(key) {
-			return v(ks, key, key)
+
+	if reflect.TypeOf(&aesPrivateKey{}) == reflect.TypeOf(key) {
+		StoreKey(ks, key, key)
+	} else {
+		if key.Private() {
+			PrivateKeyStore(ks, key, key)
+		} else {
+			PubKeyStore(ks, key, key)
 		}
 	}
+
 	return fmt.Errorf("key type not reconigned [%s]", key)
 }
 
@@ -223,18 +204,25 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 			continue
 		}
 
-		key, err := pemToPrivateKey(raw, ks.pwd)
-		if err != nil {
+		var key interface{}
+		KeyImportor := GetPemToPrivateKeys()
+		var error_out error
+		for _, v := range KeyImportor {
+			key, err = v(raw, ks.pwd)
+			if err != nil {
+				error_out = err
+			}
+			if err == nil {
+				error_out = nil
+				break
+			}
+		}
+		if error_out != nil {
 			continue
 		}
-		// TWGC todo
-		// make this map as global variable
-		var m map[reflect.Type]func(interface{}) bccsp.Key
-		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
-		m[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
-		m[reflect.TypeOf(&sm2.PrivateKey{})] = NewSM2PrivateKey
+
 		f_continue := true
-		for i, v := range m {
+		for i, v := range GetNewprik() {
 			if i == reflect.TypeOf(key) {
 				k = v(key)
 				f_continue = false
@@ -330,11 +318,24 @@ func (ks *fileBasedKeyStore) loadPrivateKey(alias string) (interface{}, error) {
 		return nil, err
 	}
 
-	privateKey, err := pemToPrivateKey(raw, ks.pwd)
-	if err != nil {
-		logger.Errorf("Failed parsing private key [%s]: [%s].", alias, err.Error())
+	var privateKey interface{}
+	KeyImportor := GetPemToPrivateKeys()
+	skip := false
+	var error_out error
+	for _, v := range KeyImportor {
+		privateKey, err = v(raw, ks.pwd)
+		if err != nil {
+			error_out = err
+		}
+		if err == nil {
+			skip = true
+			break
+		}
+	}
 
-		return nil, err
+	if !skip {
+		logger.Errorf("Failed parsing private key [%s]: [%s].", alias, error_out.Error())
+		return nil, error_out
 	}
 
 	return privateKey, nil
@@ -453,46 +454,9 @@ func PrivateKeyStore(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{})
 	return err
 }
 
-func PrivateKeyStoreSM2(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{}) error {
-	alias := hex.EncodeToString(k.SKI())
-	rawKey, err := privateKeyToPEM(privateKey.(*bccspsm2.SM2PrivateKey).GetPrivKey(), ks.pwd)
-	if err != nil {
-		logger.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
-		return err
-	}
-
-	err = ioutil.WriteFile(ks.getPathForAlias(alias, "sk"), rawKey, 0600)
-	if err != nil {
-		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
-	}
-	if err != nil {
-		return fmt.Errorf("failed storing private key [%s]", err)
-	}
-	return err
-}
-
 func PubKeyStore(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
 	alias := hex.EncodeToString(k.SKI())
 	rawKey, err := publicKeyToPEM(publicKey.(*ecdsaPublicKey).GetPubKey(), ks.pwd)
-	if err != nil {
-		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
-		return err
-	}
-
-	err = ioutil.WriteFile(ks.getPathForAlias(alias, "pk"), rawKey, 0600)
-	if err != nil {
-		logger.Errorf("Failed storing private key [%s]: [%s]", alias, err)
-		return err
-	}
-	if err != nil {
-		return fmt.Errorf("failed storing public key [%s]", err)
-	}
-	return err
-}
-
-func PubKeyStoreSM2(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
-	alias := hex.EncodeToString(k.SKI())
-	rawKey, err := publicKeyToPEM(publicKey.(*bccspsm2.SM2PublicKey).GetPubKey(), ks.pwd)
 	if err != nil {
 		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
 		return err
@@ -526,16 +490,8 @@ func StoreKey(ks *fileBasedKeyStore, k bccsp.Key, key interface{}) error {
 	return nil
 }
 
-func NewSM2PrivateKey(k interface{}) bccsp.Key {
-	return &bccspsm2.SM2PrivateKey{PrivKey: k.(*sm2.PrivateKey)}
-}
-
 func NewECDSAPrivateKey(k interface{}) bccsp.Key {
 	return &ecdsaPrivateKey{k.(*ecdsa.PrivateKey)}
-}
-
-func NewSM2PubKey(k interface{}) bccsp.Key {
-	return &bccspsm2.SM2PublicKey{PubKey: k.(*sm2.PublicKey)}
 }
 
 func NewECDSAPubKey(k interface{}) bccsp.Key {

@@ -128,7 +128,7 @@ func TestECDSAKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse PKCS#8 private key [%s]", err)
 	}
-	keyFromPEM, err := pemToPrivateKey(rawPEM, nil)
+	keyFromPEM, err := PemToPrivateKey(rawPEM, nil)
 	if err != nil {
 		t.Fatalf("Failed converting DER to private key [%s]", err)
 	}
@@ -155,12 +155,12 @@ func TestECDSAKeys(t *testing.T) {
 		t.Fatal("PrivateKeyToPEM should fail on nil")
 	}
 
-	_, err = pemToPrivateKey(nil, nil)
+	_, err = PemToPrivateKey(nil, nil)
 	if err == nil {
 		t.Fatal("PEMtoPublicKey should fail on nil")
 	}
 
-	_, err = pemToPrivateKey([]byte{0, 1, 3, 4}, nil)
+	_, err = PemToPrivateKey([]byte{0, 1, 3, 4}, nil)
 	if err == nil {
 		t.Fatal("PEMtoPublicKey should fail invalid PEM")
 	}
@@ -185,9 +185,9 @@ func TestECDSAKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed converting private key to encrypted PEM [%s]", err)
 	}
-	_, err = pemToPrivateKey(encPEM, nil)
+	_, err = PemToPrivateKey(encPEM, nil)
 	assert.Error(t, err)
-	encKeyFromPEM, err := pemToPrivateKey(encPEM, []byte("passwd"))
+	encKeyFromPEM, err := PemToPrivateKey(encPEM, []byte("passwd"))
 	if err != nil {
 		t.Fatalf("Failed converting DER to private key [%s]", err)
 	}

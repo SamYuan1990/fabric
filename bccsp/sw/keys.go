@@ -17,8 +17,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
 )
 
 type pkcs8Info struct {
@@ -184,7 +182,7 @@ func derToPrivateKey(der []byte) (key interface{}, err error) {
 	// TWGC todo
 	if key, err = x509.ParsePKCS8PrivateKey(der); err == nil {
 		switch key.(type) {
-		case *ecdsa.PrivateKey, *sm2.PrivateKey:
+		case *ecdsa.PrivateKey:
 			return
 		default:
 			return nil, errors.New("found unknown private key type in PKCS#8 wrapping")
@@ -198,7 +196,7 @@ func derToPrivateKey(der []byte) (key interface{}, err error) {
 	return nil, errors.New("invalid key type. The DER must contain an ecdsa.PrivateKey")
 }
 
-func pemToPrivateKey(raw []byte, pwd []byte) (interface{}, error) {
+func PemToPrivateKey(raw []byte, pwd []byte) (interface{}, error) {
 	block, _ := pem.Decode(raw)
 	if block == nil {
 		return nil, fmt.Errorf("failed decoding PEM. Block must be different from nil [% x]", raw)
@@ -300,23 +298,6 @@ func publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 
 func ECDSApublicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 	if publicKey.(*ecdsa.PublicKey) == nil {
-		return nil, errors.New("Invalid ecdsa public key. It must be different from nil.")
-	}
-	PubASN1, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: PubASN1,
-		},
-	), nil
-}
-
-func SM2publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
-	if publicKey.(*sm2.PublicKey) == nil {
 		return nil, errors.New("Invalid ecdsa public key. It must be different from nil.")
 	}
 	PubASN1, err := x509.MarshalPKIXPublicKey(publicKey)
