@@ -1,12 +1,9 @@
 /*
 Copyright CETCS. 2017 All Rights Reserved.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
 	SPDX-License-Identifier: Apache-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,6 +30,33 @@ type SM2PrivateKey struct {
 	PrivKey *sm2.PrivateKey
 }
 
+type pkcs8Info struct {
+	Version             int
+	PrivateKeyAlgorithm []asn1.ObjectIdentifier
+	PrivateKey          []byte
+}
+
+type ecPrivateKey struct {
+	Version       int
+	PrivateKey    []byte
+	NamedCurveOID asn1.ObjectIdentifier `asn1:"optional,explicit,tag:0"`
+	PublicKey     asn1.BitString        `asn1:"optional,explicit,tag:1"`
+}
+
+var oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+
+var oidNamedCurveSm2 = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301}
+
+func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
+	switch curve {
+	case sm2.P256():
+		return oidNamedCurveSm2, true
+	}
+	return nil, false
+}
+
+// Bytes converts this key to its byte representation,
+// if this operation is allowed.
 func (k *SM2PrivateKey) Bytes() (raw []byte, err error) {
 	return x509.MarshalECPrivateKey(k.PrivKey)
 }
@@ -84,9 +108,12 @@ type SM2PublicKey struct {
 
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
-
 func (k *SM2PublicKey) Bytes() (raw []byte, err error) {
 	raw, err = x509.MarshalPKIXPublicKey(k.PubKey)
+	if err != nil {
+		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
+	}
+	return
 }
 
 // SKI returns the subject key identifier of this key.
@@ -118,10 +145,6 @@ func (k *SM2PublicKey) Private() bool {
 
 // PublicKey returns the corresponding public key part of an asymmetric public/private key pair.
 // This method returns an error in symmetric key schemes.
-func (k *SM2PublicKey) GetPubKey() *sm2.PublicKey {
-	return k.PubKey
-}
-
 func (k *SM2PublicKey) PublicKey() (bccsp.Key, error) {
 	return k, nil
 }

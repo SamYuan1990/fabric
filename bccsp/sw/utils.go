@@ -9,6 +9,7 @@ package sw
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
+	"sync"
 
 	"reflect"
 
@@ -21,6 +22,8 @@ import (
 
 //TWGC todo
 //move this into bccsp/sw/new.go
+var lock sync.Mutex
+
 //for x509 import
 var certImport map[reflect.Type]func(interface{}) interface{}
 var keyImport map[reflect.Type]func(opt bccsp.KeyImportOpts) bccsp.KeyImportOpts
@@ -43,6 +46,8 @@ var puk2pem map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
 //to do a map and wrapper for derToPrivateKey
 
 func InitMaps() {
+	lock.Lock()
+	defer lock.Unlock()
 	// init
 	// bccsp cert Import validation
 	certImport = make(map[reflect.Type]func(interface{}) interface{})
@@ -79,29 +84,50 @@ func InitMaps() {
 }
 
 func GetCertImportMap() map[reflect.Type]func(interface{}) interface{} {
+	if certImport == nil {
+		InitMaps()
+	}
 	return certImport
 }
 
 func GetKeyImportMap() map[reflect.Type]func(opt bccsp.KeyImportOpts) bccsp.KeyImportOpts {
+	if keyImport == nil {
+		InitMaps()
+	}
 	return keyImport
 }
 
 func Getpuk2epem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
+	if puk2epem == nil {
+		InitMaps()
+	}
 	return puk2epem
 }
 
 func Getpri2der() map[reflect.Type]func(interface{}) ([]byte, error) {
+	if pri2der == nil {
+		InitMaps()
+	}
 	return pri2der
 }
 
 func Getpri2pem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
+	if pri2pem == nil {
+		InitMaps()
+	}
 	return pri2pem
 }
 
 func Getpri2epem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
+	if pri2epem == nil {
+		InitMaps()
+	}
 	return pri2epem
 }
 
 func Getpuk2pem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
+	if puk2pem == nil {
+		InitMaps()
+	}
 	return puk2pem
 }
