@@ -175,16 +175,16 @@ func (ks *fileBasedKeyStore) StoreKey(key bccsp.Key) (err error) {
 	}
 
 	if reflect.TypeOf(&aesPrivateKey{}) == reflect.TypeOf(key) {
-		StoreKey(ks, key, key)
+		return StoreKey(ks, key, key)
 	} else {
 		if key.Private() {
-			PrivateKeyStore(ks, key, key)
+			return PrivateKeyStore(ks, key, key)
 		} else {
-			PubKeyStore(ks, key, key)
+			return PubKeyStore(ks, key, key)
 		}
 	}
 
-	return fmt.Errorf("key type not reconigned [%s]", key)
+	// return fmt.Errorf("key type not reconigned [%s]", key)
 }
 
 func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err error) {
