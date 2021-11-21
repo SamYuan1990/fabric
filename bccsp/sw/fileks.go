@@ -438,7 +438,13 @@ func dirEmpty(path string) (bool, error) {
 
 func PrivateKeyStore(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{}) error {
 	alias := hex.EncodeToString(k.SKI())
-	rawKey, err := privateKeyToPEM(privateKey.(*ecdsaPrivateKey).GetPrivKey(), ks.pwd)
+	var key interface{}
+	for i, v := range GetKeyMap() {
+		if i == reflect.TypeOf(k) {
+			key = v(k)
+		}
+	}
+	rawKey, err := privateKeyToPEM(key, ks.pwd)
 	if err != nil {
 		logger.Errorf("Failed converting private key to PEM [%s]: [%s]", alias, err)
 		return err
@@ -456,7 +462,16 @@ func PrivateKeyStore(ks *fileBasedKeyStore, k bccsp.Key, privateKey interface{})
 
 func PubKeyStore(ks *fileBasedKeyStore, k bccsp.Key, publicKey interface{}) error {
 	alias := hex.EncodeToString(k.SKI())
-	rawKey, err := publicKeyToPEM(publicKey.(*ecdsaPublicKey).GetPubKey(), ks.pwd)
+	var key interface{}
+	for i, v := range GetKeyMap() {
+		if i == reflect.TypeOf(k) {
+			key = v(k)
+		}
+	}
+	rawKey, err := publicKeyToPEM(key, ks.pwd)
+
+	//rawKey, err := publicKeyToPEM(publicKey.(*ecdsaPublicKey).GetPubKey(), ks.pwd)
+
 	if err != nil {
 		logger.Errorf("Failed converting public key to PEM [%s]: [%s]", alias, err)
 		return err
@@ -496,4 +511,12 @@ func NewECDSAPrivateKey(k interface{}) bccsp.Key {
 
 func NewECDSAPubKey(k interface{}) bccsp.Key {
 	return &ecdsaPublicKey{k.(*ecdsa.PublicKey)}
+}
+
+func ECDSAPrivateKeyToInterface(k interface{}) interface{} {
+	return k.(*ecdsaPrivateKey).GetPrivKey()
+}
+
+func ECDSAPublicKeyToInterface(k interface{}) interface{} {
+	return k.(*ecdsaPublicKey).GetPubKey()
 }

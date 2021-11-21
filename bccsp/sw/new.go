@@ -149,6 +149,8 @@ var newpk map[reflect.Type]func(interface{}) bccsp.Key
 //new pri key
 var newprikey map[reflect.Type]func(interface{}) bccsp.Key
 
+var keyMap map[reflect.Type]func(k interface{}) interface{}
+
 func InitCryptoProviders() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -178,6 +180,7 @@ func InitCryptoProviders() {
 	//new key function
 	newpk = make(map[reflect.Type]func(interface{}) bccsp.Key)
 	newprikey = make(map[reflect.Type]func(interface{}) bccsp.Key)
+	keyMap = make(map[reflect.Type]func(k interface{}) interface{})
 
 	//AddWrapper for ecdsa
 	certImport[reflect.TypeOf(&x509.Certificate{})] = ECDSAPublicKeyFromCert
@@ -190,7 +193,8 @@ func InitCryptoProviders() {
 	PemToPrivateKeys = append(PemToPrivateKeys, PemToPrivateKey)
 	newpk[reflect.TypeOf(&ecdsa.PublicKey{})] = NewECDSAPubKey
 	newprikey[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
-
+	keyMap[reflect.TypeOf(&ecdsaPrivateKey{})] = ECDSAPrivateKeyToInterface
+	keyMap[reflect.TypeOf(&ecdsaPublicKey{})] = ECDSAPublicKeyToInterface
 	//AddWrapper for sm2
 	certImport[reflect.TypeOf(&gmx509.Certificate{})] = sm2.GMPublicKeyFromCert
 	keyImport[reflect.TypeOf(&ccssm2.PublicKey{})] = sm2.SM2PublicKeyImport
@@ -202,6 +206,8 @@ func InitCryptoProviders() {
 	PemToPrivateKeys = append(PemToPrivateKeys, sm2.PemToPrivateKey)
 	newpk[reflect.TypeOf(&ccssm2.PublicKey{})] = sm2.NewSM2PubKey
 	newprikey[reflect.TypeOf(&ccssm2.PrivateKey{})] = sm2.NewSM2PrivateKey
+	keyMap[reflect.TypeOf(&sm2.SM2PrivateKey{})] = sm2.SM2PrivateKeyToInterface
+	keyMap[reflect.TypeOf(&sm2.SM2PublicKey{})] = sm2.SM2PublicKeyToInterface
 }
 
 func GetCertImportMap() map[reflect.Type]func(interface{}) interface{} {
@@ -273,3 +279,13 @@ func GetNewprik() map[reflect.Type]func(interface{}) bccsp.Key {
 	}
 	return newprikey
 }
+
+func GetKeyMap() map[reflect.Type]func(interface{}) interface{} {
+	if len(keyMap) == 0 {
+		InitCryptoProviders()
+	}
+	return keyMap
+}
+
+//privateKey.(*bccspsm2.SM2PrivateKey).GetPrivKey()
+//privateKey.(*).GetPrivKey()

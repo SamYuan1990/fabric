@@ -334,3 +334,11 @@ func NewSM2PubKey(k interface{}) bccsp.Key {
 func NewSM2PrivateKey(k interface{}) bccsp.Key {
 	return &SM2PrivateKey{PrivKey: k.(*sm2.PrivateKey)}
 }
+
+func SM2PrivateKeyToInterface(k interface{}) interface{} {
+	return k.(*SM2PrivateKey).GetPrivKey()
+}
+
+func SM2PublicKeyToInterface(k interface{}) interface{} {
+	return k.(*SM2PublicKey).GetPubKey()
+}
