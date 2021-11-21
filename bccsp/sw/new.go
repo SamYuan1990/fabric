@@ -195,6 +195,7 @@ func InitCryptoProviders() {
 	newprikey[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey
 	keyMap[reflect.TypeOf(&ecdsaPrivateKey{})] = ECDSAPrivateKeyToInterface
 	keyMap[reflect.TypeOf(&ecdsaPublicKey{})] = ECDSAPublicKeyToInterface
+	keyMap[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSAPublicKeyToInterface
 	//AddWrapper for sm2
 	certImport[reflect.TypeOf(&gmx509.Certificate{})] = sm2.GMPublicKeyFromCert
 	keyImport[reflect.TypeOf(&ccssm2.PublicKey{})] = sm2.SM2PublicKeyImport
