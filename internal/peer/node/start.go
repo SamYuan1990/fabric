@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -100,6 +101,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+
+	opentracing "github.com/opentracing/opentracing-go"
+	jaeger "github.com/uber/jaeger-client-go"
+	jaegerconfig "github.com/uber/jaeger-client-go/config"
 )
 
 const (
@@ -193,6 +198,28 @@ func serve(args []string) error {
 	// Idemix does not support this *YET* but it can be easily
 	// fixed to support it. For now, we just make sure that
 	// the peer only comes up with the standard MSP
+
+	// open tracing
+	cfg := &jaegerconfig.Configuration{
+		Sampler: &jaegerconfig.SamplerConfig{
+			Type:  "const",
+			Param: 1,
+		},
+		Reporter: &jaegerconfig.ReporterConfig{
+			LogSpans: true,
+		},
+	}
+	tracer, closer, err := cfg.New(
+		"peer",
+		jaegerconfig.Logger(jaeger.StdLogger),
+	)
+	defer closer.Close()
+	if err != nil {
+		log.Fatalf("ERROR: cannot init Jaeger: %v", err)
+	}
+	opentracing.SetGlobalTracer(tracer)
+	// end of open tracing
+
 	mspType := mgmt.GetLocalMSP(factory.GetDefault()).GetType()
 	if mspType != msp.FABRIC {
 		panic("Unsupported msp type " + msp.ProviderTypeToString(mspType))

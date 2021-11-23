@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/protoext"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protoutil"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -542,6 +543,7 @@ func (s *GossipStateProviderImpl) Stop() {
 func (s *GossipStateProviderImpl) deliverPayloads() {
 	for {
 		select {
+		// todo tx tracing
 		// Wait for notification that next seq has arrived
 		case <-s.payloads.Ready():
 			s.logger.Debugf("[%s] Ready to transfer payloads (blocks) to the ledger, next block number is = [%d]", s.chainID, s.payloads.Next())
@@ -790,12 +792,18 @@ func (s *GossipStateProviderImpl) straggler(currHeight uint64, receivedPayload *
 	return stateDisabled && tooFarBehind && peerDependent
 }
 
+// todo tx tracing
 func (s *GossipStateProviderImpl) commitBlock(block *common.Block, pvtData util.PvtDataCollections) error {
 
 	t1 := time.Now()
 
 	// Commit block with available private transactions
-	if err := s.ledger.StoreBlock(block, pvtData); err != nil {
+	span := opentracing.GlobalTracer().StartSpan("commitBlock")
+	defer span.Finish()
+	StoreBlock := opentracing.GlobalTracer().StartSpan("StoreBlock", opentracing.ChildOf(span.Context()))
+	err := s.ledger.StoreBlock(block, pvtData)
+	StoreBlock.Finish()
+	if err != nil {
 		s.logger.Errorf("Got error while committing(%+v)", errors.WithStack(err))
 		return err
 	}
@@ -804,7 +812,9 @@ func (s *GossipStateProviderImpl) commitBlock(block *common.Block, pvtData util.
 	s.stateMetrics.CommitDuration.With("channel", s.chainID).Observe(sinceT1.Seconds())
 
 	// Update ledger height
+	UpdateLedgerHeight := opentracing.GlobalTracer().StartSpan("UpdateLedgerHeight", opentracing.ChildOf(span.Context()))
 	s.mediator.UpdateLedgerHeight(block.Header.Number+1, common2.ChannelID(s.chainID))
+	UpdateLedgerHeight.Finish()
 	s.logger.Debugf("[%s] Committed block [%d] with %d transaction(s)",
 		s.chainID, block.Header.Number, len(block.Data.Data))
 

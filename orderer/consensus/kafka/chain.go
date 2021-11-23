@@ -22,6 +22,8 @@ import (
 	"github.com/hyperledger/fabric/orderer/consensus"
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/pkg/errors"
+
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // Used for capturing metrics -- see processMessagesToBlocks
@@ -210,6 +212,8 @@ func (chain *chainImpl) reprocessConfigPending() {
 
 // Implements the consensus.Chain interface. Called by Broadcast().
 func (chain *chainImpl) Order(env *cb.Envelope, configSeq uint64) error {
+	span := opentracing.GlobalTracer().StartSpan("Order")
+	defer span.Finish()
 	return chain.order(env, configSeq, int64(0))
 }
 
