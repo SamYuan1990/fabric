@@ -53,6 +53,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	opentracing "github.com/opentracing/opentracing-go"
+	jaeger "github.com/uber/jaeger-client-go"
+	jaegerconfig "github.com/uber/jaeger-client-go/config"
 )
 
 var logger = flogging.MustGetLogger("orderer.common.server")
@@ -69,6 +73,28 @@ var (
 
 // Main is the entry point of orderer process
 func Main() {
+
+	// open tracing
+	cfg := &jaegerconfig.Configuration{
+		Sampler: &jaegerconfig.SamplerConfig{
+			Type:  "const",
+			Param: 1,
+		},
+		Reporter: &jaegerconfig.ReporterConfig{
+			LogSpans: true,
+		},
+	}
+	tracer, closer, err := cfg.New(
+		"orderer",
+		jaegerconfig.Logger(jaeger.StdLogger),
+	)
+	defer closer.Close()
+	if err != nil {
+		fmt.Errorf("ERROR: cannot init Jaeger: %v", err)
+	}
+	opentracing.SetGlobalTracer(tracer)
+	// end of open tracing
+
 	fullCmd := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	// "version" command

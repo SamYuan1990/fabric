@@ -26,6 +26,8 @@ import (
 	"github.com/hyperledger/fabric/protoutil"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 var endorserLogger = flogging.MustGetLogger("endorser")
@@ -309,6 +311,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		e.Metrics.ProposalValidationFailed.Add(1)
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
 	}
+	span := opentracing.GlobalTracer().StartSpan("ProcessProposal", opentracing.Tag{Key: "txid", Value: up.TxID()})
+	defer span.Finish()
 
 	var channel *Channel
 	if up.ChannelID() != "" {
@@ -337,7 +341,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		e.Metrics.ProposalDuration.With(meterLabels...).Observe(time.Since(startTime).Seconds())
 	}()
 
-	pResp, err := e.ProcessProposalSuccessfullyOrError(up)
+	pResp, err := e.ProcessProposalSuccessfullyOrError(up, span)
 	if err != nil {
 		endorserLogger.Warnw("Failed to invoke chaincode", "channel", up.ChannelHeader.ChannelId, "chaincode", up.ChaincodeName, "error", err.Error())
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, nil
@@ -355,7 +359,9 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	return pResp, nil
 }
 
-func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal) (*pb.ProposalResponse, error) {
+func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal, span opentracing.Span) (*pb.ProposalResponse, error) {
+	l_span := opentracing.GlobalTracer().StartSpan("ProcessProposalSuccessfullyOrError", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
+	defer l_span.Finish()
 	txParams := &ccprovider.TransactionParams{
 		ChannelID:  up.ChannelHeader.ChannelId,
 		TxID:       up.ChannelHeader.TxId,
@@ -366,7 +372,9 @@ func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal) (*pb
 	logger := decorateLogger(endorserLogger, txParams)
 
 	if acquireTxSimulator(up.ChannelHeader.ChannelId, up.ChaincodeName) {
+		TxSumilator_span := opentracing.GlobalTracer().StartSpan("GetTxSimulator", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 		txSim, err := e.Support.GetTxSimulator(up.ChannelID(), up.TxID())
+		TxSumilator_span.Finish()
 		if err != nil {
 			return nil, err
 		}
@@ -379,8 +387,9 @@ func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal) (*pb
 		// txsim.Done() more than once does not cause any issue. If the txsim is already
 		// released, the following txsim.Done() simply returns.
 		defer txSim.Done()
-
+		GetHistoryQueryExecutor := opentracing.GlobalTracer().StartSpan("GetHistoryQueryExecutor", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 		hqe, err := e.Support.GetHistoryQueryExecutor(up.ChannelID())
+		GetHistoryQueryExecutor.Finish()
 		if err != nil {
 			return nil, err
 		}
@@ -389,26 +398,34 @@ func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal) (*pb
 		txParams.HistoryQueryExecutor = hqe
 	}
 
+	ChaincodeEndorsementInfo := opentracing.GlobalTracer().StartSpan("ChaincodeEndorsementInfo", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 	cdLedger, err := e.Support.ChaincodeEndorsementInfo(up.ChannelID(), up.ChaincodeName, txParams.TXSimulator)
+	ChaincodeEndorsementInfo.Finish()
 	if err != nil {
 		return nil, errors.WithMessagef(err, "make sure the chaincode %s has been successfully defined on channel %s and try again", up.ChaincodeName, up.ChannelID())
 	}
 
 	// 1 -- simulate
+	SimulateProposalSpan := opentracing.GlobalTracer().StartSpan("SimulateProposal", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 	res, simulationResult, ccevent, err := e.SimulateProposal(txParams, up.ChaincodeName, up.Input)
+	SimulateProposalSpan.Finish()
 	if err != nil {
 		return nil, errors.WithMessage(err, "error in simulation")
 	}
 
+	cceventBytesSpan := opentracing.GlobalTracer().StartSpan("CreateCCEventBytes", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 	cceventBytes, err := CreateCCEventBytes(ccevent)
+	cceventBytesSpan.Finish()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal chaincode event")
 	}
 
+	GetBytesProposalResponsePayloadSpan := opentracing.GlobalTracer().StartSpan("GetBytesProposalResponsePayload", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 	prpBytes, err := protoutil.GetBytesProposalResponsePayload(up.ProposalHash, res, simulationResult, cceventBytes, &pb.ChaincodeID{
 		Name:    up.ChaincodeName,
 		Version: cdLedger.Version,
 	})
+	GetBytesProposalResponsePayloadSpan.Finish()
 	if err != nil {
 		logger.Warning("Failed marshaling the proposal response payload to bytes", err)
 		return nil, errors.WithMessage(err, "failed to create the proposal response")
@@ -447,7 +464,9 @@ func (e *Endorser) ProcessProposalSuccessfullyOrError(up *UnpackedProposal) (*pb
 	logger.Debugf("escc for chaincode %s is %s", up.ChaincodeName, escc)
 
 	// Note, mPrpBytes is the same as prpBytes by default endorsement plugin, but others could change it.
+	EndorseWithPluginSpan := opentracing.GlobalTracer().StartSpan("EndorseWithPlugin", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: up.TxID()})
 	endorsement, mPrpBytes, err := e.Support.EndorseWithPlugin(escc, up.ChannelID(), prpBytes, up.SignedProposal)
+	EndorseWithPluginSpan.Finish()
 	if err != nil {
 		meterLabels = append(meterLabels, "chaincodeerror", strconv.FormatBool(false))
 		e.Metrics.EndorsementsFailed.With(meterLabels...).Add(1)

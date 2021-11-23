@@ -24,6 +24,7 @@ import (
 	privdatacommon "github.com/hyperledger/fabric/gossip/privdata/common"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protoutil"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -148,7 +149,10 @@ func NewCoordinator(mspID string, support Support, store *transientstore.Store, 
 }
 
 // StoreBlock stores block with private data into the ledger
+// todo tx tracing
 func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDataCollections) error {
+	span := opentracing.GlobalTracer().StartSpan("StoreBlock")
+	defer span.Finish()
 	if block.Data == nil {
 		return errors.New("Block data is empty")
 	}
@@ -161,7 +165,9 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 	c.logger.Debugf("Validating block [%d]", block.Header.Number)
 
 	validationStart := time.Now()
+	Validate := opentracing.GlobalTracer().StartSpan("Validate", opentracing.ChildOf(span.Context()))
 	err := c.Validator.Validate(block)
+	Validate.Finish()
 	c.reportValidationDuration(time.Since(validationStart))
 	if err != nil {
 		c.logger.Errorf("Validation failed: %+v", err)
@@ -180,6 +186,7 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 	}
 	if exist {
 		commitOpts := &ledger.CommitOptions{FetchPvtDataFromLedger: true}
+		// todo tx tracing
 		return c.CommitLegacy(blockAndPvtData, commitOpts)
 	}
 
@@ -212,7 +219,9 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 
 	// Retrieve the private data.
 	// RetrievePvtdata checks this peer's eligibility and then retreives from cache, transient store, or from a remote peer.
+	RetrievePvtdata := opentracing.GlobalTracer().StartSpan("RetrievePvtdata", opentracing.ChildOf(span.Context()))
 	retrievedPvtdata, err := pdp.RetrievePvtdata(pvtdataToRetrieve)
+	RetrievePvtdata.Finish()
 	if err != nil {
 		c.logger.Warningf("Failed to retrieve pvtdata: %s", err)
 		return err
@@ -223,7 +232,10 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 
 	// commit block and private data
 	commitStart := time.Now()
+	// todo tx tracing
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy", opentracing.ChildOf(span.Context()))
 	err = c.CommitLegacy(blockAndPvtData, &ledger.CommitOptions{})
+	CommitLegacy.Finish()
 	c.reportCommitDuration(time.Since(commitStart))
 	if err != nil {
 		return errors.Wrap(err, "commit failed")
