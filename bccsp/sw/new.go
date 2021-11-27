@@ -121,6 +121,7 @@ func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore
 //TWGC todo
 //move this into bccsp/sw/new.go
 var lock sync.Mutex
+var inited bool
 
 //for x509 import
 var certImport map[reflect.Type]func(interface{}) interface{}
@@ -154,6 +155,9 @@ var keyMap map[reflect.Type]func(k interface{}) interface{}
 func InitCryptoProviders() {
 	lock.Lock()
 	defer lock.Unlock()
+	if inited {
+		return
+	}
 	// init
 	// bccsp cert Import validation
 	certImport = make(map[reflect.Type]func(interface{}) interface{})
@@ -209,80 +213,81 @@ func InitCryptoProviders() {
 	newprikey[reflect.TypeOf(&ccssm2.PrivateKey{})] = sm2.NewSM2PrivateKey
 	keyMap[reflect.TypeOf(&sm2.SM2PrivateKey{})] = sm2.SM2PrivateKeyToInterface
 	keyMap[reflect.TypeOf(&sm2.SM2PublicKey{})] = sm2.SM2PublicKeyToInterface
+	inited = true
 }
 
 func GetCertImportMap() map[reflect.Type]func(interface{}) interface{} {
-	if len(certImport) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return certImport
 }
 
 func GetKeyImportMap() map[reflect.Type]func(opt bccsp.KeyImportOpts) bccsp.KeyImportOpts {
-	if len(keyImport) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return keyImport
 }
 
 func Getpuk2epem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
-	if len(puk2epem) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return puk2epem
 }
 
 func Getpri2der() map[reflect.Type]func(interface{}) ([]byte, error) {
-	if len(pri2der) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return pri2der
 }
 
 func Getpri2pem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
-	if len(pri2pem) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return pri2pem
 }
 
 func Getpri2epem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
-	if len(pri2epem) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return pri2epem
 }
 
 func Getpuk2pem() map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error) {
-	if len(puk2pem) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return puk2pem
 }
 
 func GetPemToPrivateKeys() []func(raw []byte, pwd []byte) (interface{}, error) {
-	if len(PemToPrivateKeys) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return PemToPrivateKeys
 }
 
 func GetNewpk() map[reflect.Type]func(interface{}) bccsp.Key {
-	if len(newpk) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return newpk
 }
 
 func GetNewprik() map[reflect.Type]func(interface{}) bccsp.Key {
-	if len(newprikey) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return newprikey
 }
 
 func GetKeyMap() map[reflect.Type]func(interface{}) interface{} {
-	if len(keyMap) == 0 {
+	if !inited {
 		InitCryptoProviders()
 	}
 	return keyMap
