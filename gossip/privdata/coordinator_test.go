@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/peer"
 	tspb "github.com/hyperledger/fabric-protos-go/transientstore"
 	"github.com/hyperledger/fabric/bccsp/factory"
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/common/metrics/disabled"
 	util2 "github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/common/privdata"
@@ -647,6 +648,8 @@ func TestCoordinatorStoreInvalidBlock(t *testing.T) {
 		Validator:          &validatorMock{},
 		CapabilityProvider: capabilityProvider,
 	}, store.store, peerSelfSignedData, metrics, testConfig, idDeserializerFactory)
+	flogging.InitSpan()
+
 	err = coordinator.StoreBlock(block, pvtData)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Block.Metadata is nil or Block.Metadata lacks a Tx filter bitmap")
