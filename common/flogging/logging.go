@@ -284,8 +284,11 @@ func (TS *TracingSpans) GetSpan(key string) opentracing.Span {
 	span, ok := TS.Spans[key]
 	if ok {
 		return span
+	} else {
+		span = opentracing.GlobalTracer().StartSpan(key)
+		TS.Spans[key] = span
+		return span
 	}
-	return nil
 }
 
 // set
