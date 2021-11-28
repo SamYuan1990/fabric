@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/hyperledger/fabric/common/flogging/fabenc"
+	"github.com/opentracing/opentracing-go"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -247,4 +248,65 @@ func (l *Logging) WriteEntry(e zapcore.Entry, fields []zapcore.Field) {
 func (l *Logging) Logger(name string) *FabricLogger {
 	zl := l.ZapLogger(name)
 	return NewFabricLogger(zl)
+}
+
+// map here
+// string(key) span value
+
+var TapeSpan *TracingSpans
+
+type TracingSpans struct {
+	Spans map[string]opentracing.Span
+	Lock  sync.Mutex
+}
+
+// get
+func GetGlobalSpan() *TracingSpans {
+	return TapeSpan
+}
+
+// init
+func InitSpan() *TracingSpans {
+	Spans := make(map[string]opentracing.Span)
+
+	TapeSpan = &TracingSpans{
+		Spans: Spans,
+	}
+
+	return GetGlobalSpan()
+}
+
+// get specific
+func (TS *TracingSpans) GetSpan(key string) opentracing.Span {
+	TS.Lock.Lock()
+	defer TS.Lock.Unlock()
+
+	span, ok := TS.Spans[key]
+	if ok {
+		return span
+	}
+	return nil
+}
+
+// set
+func (TS *TracingSpans) SetSpan(key string, span opentracing.Span) {
+	TS.Lock.Lock()
+	defer TS.Lock.Unlock()
+
+	span, ok := TS.Spans[key]
+	if !ok {
+		TS.Spans[key] = span
+	}
+}
+
+// clean
+func (TS *TracingSpans) CleanSpan(key string) {
+	TS.Lock.Lock()
+	defer TS.Lock.Unlock()
+
+	span, ok := TS.Spans[key]
+	if ok {
+		span.Finish()
+		delete(TS.Spans, key)
+	}
 }

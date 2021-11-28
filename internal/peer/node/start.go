@@ -209,11 +209,14 @@ func serve(args []string) error {
 			LogSpans: true,
 		},
 	}
+	tracer_name := "peer"
+	tracer_name = os.Getenv("JAEGER_SERVICE_NAME")
 	tracer, closer, err := cfg.New(
-		"peer",
+		tracer_name,
 		jaegerconfig.Logger(jaeger.StdLogger),
 	)
 	defer closer.Close()
+	flogging.InitSpan()
 	if err != nil {
 		log.Fatalf("ERROR: cannot init Jaeger: %v", err)
 	}

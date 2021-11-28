@@ -19,6 +19,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-protos-go/transientstore"
 	vsccErrors "github.com/hyperledger/fabric/common/errors"
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/comm"
 	common2 "github.com/hyperledger/fabric/gossip/common"
@@ -801,8 +802,10 @@ func (s *GossipStateProviderImpl) commitBlock(block *common.Block, pvtData util.
 	span := opentracing.GlobalTracer().StartSpan("commitBlock")
 	defer span.Finish()
 	StoreBlock := opentracing.GlobalTracer().StartSpan("StoreBlock", opentracing.ChildOf(span.Context()))
+	str := block.String() + "_StoreBlock"
+	flogging.GetGlobalSpan().SetSpan(str, StoreBlock)
 	err := s.ledger.StoreBlock(block, pvtData)
-	StoreBlock.Finish()
+	flogging.GetGlobalSpan().CleanSpan(str)
 	if err != nil {
 		s.logger.Errorf("Got error while committing(%+v)", errors.WithStack(err))
 		return err

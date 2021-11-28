@@ -180,7 +180,8 @@ func (v *TxValidator) chainExists(chain string) bool {
 //    is violated, this code must be changed.
 func (v *TxValidator) Validate(block *common.Block) error {
 	// todo tx tracing
-	span := opentracing.GlobalTracer().StartSpan("StoreBlock")
+	str := block.String() + "Validate"
+	span := flogging.GetGlobalSpan().GetSpan(str)
 	defer span.Finish()
 	var err error
 	var errPos int

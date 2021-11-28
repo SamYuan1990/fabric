@@ -14,6 +14,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/peer"
 	protostransientstore "github.com/hyperledger/fabric-protos-go/transientstore"
 	"github.com/hyperledger/fabric/common/channelconfig"
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core/committer"
 	"github.com/hyperledger/fabric/core/committer/txvalidator"
 	"github.com/hyperledger/fabric/core/common/privdata"
@@ -151,8 +152,8 @@ func NewCoordinator(mspID string, support Support, store *transientstore.Store, 
 // StoreBlock stores block with private data into the ledger
 // todo tx tracing
 func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDataCollections) error {
-	span := opentracing.GlobalTracer().StartSpan("StoreBlock")
-	defer span.Finish()
+	str := block.String() + "_StoreBlock"
+	span := flogging.GetGlobalSpan().GetSpan(str)
 	if block.Data == nil {
 		return errors.New("Block data is empty")
 	}
@@ -166,8 +167,10 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 
 	validationStart := time.Now()
 	Validate := opentracing.GlobalTracer().StartSpan("Validate", opentracing.ChildOf(span.Context()))
+	str1 := block.String() + "Validate"
+	flogging.GetGlobalSpan().SetSpan(str1, Validate)
 	err := c.Validator.Validate(block)
-	Validate.Finish()
+	flogging.GetGlobalSpan().CleanSpan(str1)
 	c.reportValidationDuration(time.Since(validationStart))
 	if err != nil {
 		c.logger.Errorf("Validation failed: %+v", err)

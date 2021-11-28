@@ -86,8 +86,10 @@ func Main() {
 			LogSpans: true,
 		},
 	}
+	tracer_name := "orderer"
+	tracer_name = os.Getenv("JAEGER_SERVICE_NAME")
 	tracer, closer, err := cfg.New(
-		"orderer",
+		tracer_name,
 		jaegerconfig.Logger(jaeger.StdLogger),
 	)
 	defer closer.Close()
