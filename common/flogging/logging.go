@@ -252,7 +252,6 @@ func (l *Logging) Logger(name string) *FabricLogger {
 
 // map here
 // string(key) span value
-
 var TapeSpan *TracingSpans
 
 type TracingSpans struct {
@@ -277,18 +276,15 @@ func InitSpan() *TracingSpans {
 }
 
 // get specific
-func (TS *TracingSpans) GetSpan(key string) opentracing.Span {
+func (TS *TracingSpans) GetSpan(key string) (opentracing.Span, bool) {
 	TS.Lock.Lock()
 	defer TS.Lock.Unlock()
 
+	fmt.Println("get " + key)
 	span, ok := TS.Spans[key]
-	if ok {
-		return span
-	} else {
-		span = opentracing.GlobalTracer().StartSpan(key)
-		TS.Spans[key] = span
-		return span
-	}
+	fmt.Println(ok)
+	fmt.Println(span)
+	return span, ok
 }
 
 // set
@@ -296,10 +292,9 @@ func (TS *TracingSpans) SetSpan(key string, span opentracing.Span) {
 	TS.Lock.Lock()
 	defer TS.Lock.Unlock()
 
-	span, ok := TS.Spans[key]
-	if !ok {
-		TS.Spans[key] = span
-	}
+	fmt.Println("set " + key)
+	fmt.Println(span)
+	TS.Spans[key] = span
 }
 
 // clean
@@ -307,9 +302,9 @@ func (TS *TracingSpans) CleanSpan(key string) {
 	TS.Lock.Lock()
 	defer TS.Lock.Unlock()
 
-	span, ok := TS.Spans[key]
+	fmt.Println("delete " + key)
+	_, ok := TS.Spans[key]
 	if ok {
-		span.Finish()
 		delete(TS.Spans, key)
 	}
 }

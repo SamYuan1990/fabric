@@ -8,6 +8,7 @@ package txvalidator
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -180,8 +181,12 @@ func (v *TxValidator) chainExists(chain string) bool {
 //    is violated, this code must be changed.
 func (v *TxValidator) Validate(block *common.Block) error {
 	// todo tx tracing
-	str := block.String() + "Validate"
-	span := flogging.GetGlobalSpan().GetSpan(str)
+	str := fmt.Sprint(block.Header.Number) + "_Validate"
+	logger.Infof("[%s]\n", str)
+	span, _ := flogging.GetGlobalSpan().GetSpan(str)
+	/*if span == nil {
+		span = opentracing.GlobalTracer().StartSpan("Validate")
+	}*/
 	defer span.Finish()
 	var err error
 	var errPos int

@@ -8,6 +8,7 @@ package state
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -802,7 +803,8 @@ func (s *GossipStateProviderImpl) commitBlock(block *common.Block, pvtData util.
 	span := opentracing.GlobalTracer().StartSpan("commitBlock")
 	defer span.Finish()
 	StoreBlock := opentracing.GlobalTracer().StartSpan("StoreBlock", opentracing.ChildOf(span.Context()))
-	str := block.String() + "_StoreBlock"
+	str := fmt.Sprint(block.Header.Number) + "_StoreBlock"
+	s.logger.Infof("[%s]\n", str)
 	flogging.GetGlobalSpan().SetSpan(str, StoreBlock)
 	err := s.ledger.StoreBlock(block, pvtData)
 	flogging.GetGlobalSpan().CleanSpan(str)

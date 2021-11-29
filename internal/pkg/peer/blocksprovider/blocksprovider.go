@@ -218,6 +218,7 @@ func (d *Deliverer) DeliverBlocks() {
 }
 
 func (d *Deliverer) processMsg(msg *orderer.DeliverResponse) error {
+	// todo tx tracing
 	switch t := msg.Type.(type) {
 	case *orderer.DeliverResponse_Status:
 		if t.Status == common.Status_SUCCESS {

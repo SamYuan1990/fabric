@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package privdata
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/hyperledger/fabric-protos-go/common"
@@ -152,8 +153,13 @@ func NewCoordinator(mspID string, support Support, store *transientstore.Store, 
 // StoreBlock stores block with private data into the ledger
 // todo tx tracing
 func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDataCollections) error {
-	str := block.String() + "_StoreBlock"
-	span := flogging.GetGlobalSpan().GetSpan(str)
+	str := fmt.Sprint(block.Header.Number) + "_StoreBlock"
+	c.logger.Infof("[%s]\n", str)
+	span, _ := flogging.GetGlobalSpan().GetSpan(str)
+	//if span == nil {
+	//	span = opentracing.GlobalTracer().StartSpan("StoreBlock")
+	//}
+	defer span.Finish()
 	if block.Data == nil {
 		return errors.New("Block data is empty")
 	}
@@ -162,14 +168,18 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 	}
 
 	c.logger.Infof("Received block [%d] from buffer", block.Header.Number)
-
+	c.logger.Info(opentracing.GlobalTracer())
+	c.logger.Info(span)
+	c.logger.Info(block.String())
 	c.logger.Debugf("Validating block [%d]", block.Header.Number)
 
 	validationStart := time.Now()
 	Validate := opentracing.GlobalTracer().StartSpan("Validate", opentracing.ChildOf(span.Context()))
-	str1 := block.String() + "Validate"
+	str1 := fmt.Sprint(block.Header.Number) + "_Validate"
+	c.logger.Debugf("[%s]", str1)
 	flogging.GetGlobalSpan().SetSpan(str1, Validate)
 	err := c.Validator.Validate(block)
+	c.logger.Info("debugging")
 	flogging.GetGlobalSpan().CleanSpan(str1)
 	c.reportValidationDuration(time.Since(validationStart))
 	if err != nil {
