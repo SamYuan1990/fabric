@@ -19,6 +19,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	btltestutil "github.com/hyperledger/fabric/core/ledger/pvtdatapolicy/testutil"
 	"github.com/hyperledger/fabric/core/ledger/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,7 +59,7 @@ func TestPvtdataResultsItr(t *testing.T) {
 	putPvtUpdates(t, updates, "ns2", "coll1", "key5", []byte("pvt_value5"), version.NewHeight(1, 5))
 	putPvtUpdates(t, updates, "ns2", "coll1", "key6", []byte("pvt_value6"), version.NewHeight(1, 6))
 	putPvtUpdates(t, updates, "ns3", "coll1", "key7", []byte("pvt_value7"), version.NewHeight(1, 7))
-	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7)))
+	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7), nil))
 	qe := newQueryExecutor(txMgr, "", nil, true, testHashFunc)
 
 	resItr, err := qe.GetPrivateDataRangeScanIterator("ns1", "coll1", "key1", "key3")
@@ -114,7 +115,7 @@ func testPrivateDataMetadataRetrievalByHash(t *testing.T, env testEnv) {
 	blkAndPvtdata1 := prepareNextBlockForTestFromSimulator(t, bg, s1)
 	_, _, err := txMgr.ValidateAndPrepare(blkAndPvtdata1, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	require.NoError(t, txMgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy")))
 
 	t.Run("query-helper-for-queryexecutor", func(t *testing.T) {
 		qe := newQueryExecutor(txMgr, "", nil, true, testHashFunc)
@@ -155,7 +156,7 @@ func testGetPvtdataHash(t *testing.T, env testEnv) {
 		util.ComputeStringHash("existing-value"),
 		version.NewHeight(1, 1),
 	)
-	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 5)))
+	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 5), nil))
 
 	s, _ := txMgr.NewTxSimulator("test_tx1")
 	simulator := s.(*txSimulator)

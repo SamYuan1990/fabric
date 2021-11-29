@@ -310,14 +310,14 @@ func (h *testHelper) commitUpdatesForTesting(blkNum uint64, updates *privacyenab
 	h.purgeMgr.PrepareForExpiringKeys(blkNum)
 	require.NoError(h.t, h.purgeMgr.UpdateExpiryInfo(updates.PvtUpdates, updates.HashUpdates))
 	require.NoError(h.t, h.purgeMgr.AddExpiredEntriesToUpdateBatch(updates.PvtUpdates, updates.HashUpdates))
-	require.NoError(h.t, h.db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(blkNum, 1)))
+	require.NoError(h.t, h.db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(blkNum, 1), nil))
 	h.db.ClearCachedVersions()
 	require.NoError(h.t, h.purgeMgr.BlockCommitDone())
 }
 
 func (h *testHelper) commitPvtDataOfOldBlocksForTesting(updates *privacyenabledstate.UpdateBatch) {
 	require.NoError(h.t, h.purgeMgr.UpdateExpiryInfoOfPvtDataOfOldBlocks(updates.PvtUpdates))
-	require.NoError(h.t, h.db.ApplyPrivacyAwareUpdates(updates, nil))
+	require.NoError(h.t, h.db.ApplyPrivacyAwareUpdates(updates, nil, nil))
 }
 
 func (h *testHelper) checkPvtdataExists(ns, coll, key string, value []byte) {

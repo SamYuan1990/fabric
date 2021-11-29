@@ -111,7 +111,7 @@ func testDB(t *testing.T, env TestEnv) {
 	putPvtUpdates(t, updates, "ns1", "coll1", "key1", []byte("pvt_value1"), version.NewHeight(1, 4))
 	putPvtUpdates(t, updates, "ns1", "coll1", "key2", []byte("pvt_value2"), version.NewHeight(1, 5))
 	putPvtUpdates(t, updates, "ns2", "coll1", "key3", []byte("pvt_value3"), version.NewHeight(1, 6))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6), nil))
 	bulkOptimizable, ok := db.VersionedDB.(statedb.BulkOptimizable)
 	if ok {
 		bulkOptimizable.ClearCachedVersions()
@@ -140,7 +140,7 @@ func testDB(t *testing.T, env TestEnv) {
 	updates = NewUpdateBatch()
 	updates.PubUpdates.Delete("ns1", "key1", version.NewHeight(2, 7))
 	deletePvtUpdates(t, updates, "ns1", "coll1", "key1", version.NewHeight(2, 7))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7), nil))
 
 	vv, err = db.GetState("ns1", "key1")
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func testGetStateMultipleKeys(t *testing.T, env TestEnv) {
 	putPvtUpdates(t, updates, "ns1", "coll1", "key1", []byte("pvt_value1"), version.NewHeight(1, 4))
 	putPvtUpdates(t, updates, "ns1", "coll1", "key2", []byte("pvt_value2"), version.NewHeight(1, 5))
 	putPvtUpdates(t, updates, "ns1", "coll1", "key3", []byte("pvt_value3"), version.NewHeight(1, 6))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6), nil))
 
 	versionedVals, err := db.GetStateMultipleKeys("ns1", []string{"key1", "key3"})
 	require.NoError(t, err)
@@ -228,7 +228,7 @@ func testGetStateRangeScanIterator(t *testing.T, env TestEnv) {
 	putPvtUpdates(t, updates, "ns2", "coll1", "key5", []byte("pvt_value5"), version.NewHeight(1, 5))
 	putPvtUpdates(t, updates, "ns2", "coll1", "key6", []byte("pvt_value6"), version.NewHeight(1, 6))
 	putPvtUpdates(t, updates, "ns3", "coll1", "key7", []byte("pvt_value7"), version.NewHeight(1, 7))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 7), nil))
 
 	itr1, _ := db.GetStateRangeScanIterator("ns1", "key1", "")
 	testItr(t, itr1, []string{"key1", "key2", "key3", "key4"})
@@ -293,7 +293,7 @@ func testQueryOnCouchDB(t *testing.T, env TestEnv) {
 		putPvtUpdates(t, updates, "ns1", "coll1", testKey(i), []byte(jsonValue), version.NewHeight(1, uint64(i)))
 		putPvtUpdates(t, updates, "ns2", "coll1", testKey(i), []byte(jsonValue), version.NewHeight(1, uint64(i)))
 	}
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(1, 11)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(1, 11), nil))
 
 	// query for owner=jerry, use namespace "ns1"
 	itr, err := db.ExecuteQuery("ns1", `{"selector":{"owner":"jerry"}}`)
@@ -366,7 +366,7 @@ func testLongDBNameOnCouchDB(t *testing.T, env TestEnv) {
 	updates.PvtUpdates.Put(ns, coll, "key1", []byte("pvt_value"), version.NewHeight(1, 2))
 	updates.HashUpdates.Put(ns, coll, util.ComputeStringHash("key1"), util.ComputeHash([]byte("pvt_value")), version.NewHeight(1, 2))
 
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6), nil))
 
 	vv, err := db.GetState(ns, "key1")
 	require.NoError(t, err)
@@ -551,7 +551,7 @@ func testMetadataRetrieval(t *testing.T, env TestEnv) {
 	putPvtUpdatesWithMetadata(t, updates, "ns1", "coll1", "key1", []byte("pvt_value1"), []byte("metadata1"), version.NewHeight(1, 4))
 	putPvtUpdatesWithMetadata(t, updates, "ns1", "coll1", "key2", []byte("pvt_value2"), nil, version.NewHeight(1, 5))
 	putPvtUpdatesWithMetadata(t, updates, "ns2", "coll1", "key3", []byte("pvt_value3"), nil, version.NewHeight(1, 6))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 6), nil))
 
 	vm, _ := db.GetStateMetadata("ns1", "key1")
 	require.Equal(t, vm, []byte("metadata1"))
@@ -616,7 +616,7 @@ func testDrop(t *testing.T, env TestEnv) {
 	updates := NewUpdateBatch()
 	updates.PubUpdates.Put("ns1", "key1", []byte("value1"), version.NewHeight(1, 1))
 	putPvtUpdates(t, updates, "ns1", "coll1", "key1", []byte("pvt_value1"), version.NewHeight(1, 2))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 2)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(2, 2), nil))
 
 	vv, err := db.GetState("ns1", "key1")
 	require.NoError(t, err)

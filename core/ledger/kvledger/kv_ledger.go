@@ -33,6 +33,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/pvtdatastorage"
 	"github.com/hyperledger/fabric/internal/pkg/txflags"
 	"github.com/hyperledger/fabric/protoutil"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -587,6 +588,7 @@ func (l *kvLedger) NewHistoryQueryExecutor() (ledger.HistoryQueryExecutor, error
 // After the block is committed, it sends a commitDone event.
 // Refer to processEvents function to understand how the channels and events work together to handle synchronization.
 func (l *kvLedger) CommitLegacy(pvtdataAndBlock *ledger.BlockAndPvtData, commitOpts *ledger.CommitOptions) error {
+	// todo id tracing
 	blockNumber := pvtdataAndBlock.Block.Header.Number
 	l.snapshotMgr.events <- &event{commitStart, blockNumber}
 	<-l.snapshotMgr.commitProceed
@@ -601,6 +603,12 @@ func (l *kvLedger) CommitLegacy(pvtdataAndBlock *ledger.BlockAndPvtData, commitO
 
 // commit commits the block and the corresponding pvt data in an atomic operation.
 func (l *kvLedger) commit(pvtdataAndBlock *ledger.BlockAndPvtData, commitOpts *ledger.CommitOptions) error {
+
+	str := fmt.Sprint(pvtdataAndBlock.Block.Header.Number) + "_CommitLegacy"
+	logger.Infof("[%s]\n", str)
+	span, _ := flogging.GetGlobalSpan().GetSpan(str)
+	defer span.Finish()
+
 	var err error
 	block := pvtdataAndBlock.Block
 	blockNo := pvtdataAndBlock.Block.Header.Number
@@ -627,7 +635,9 @@ func (l *kvLedger) commit(pvtdataAndBlock *ledger.BlockAndPvtData, commitOpts *l
 	}
 
 	logger.Debugf("[%s] Validating state for block [%d]", l.ledgerID, blockNo)
+	span1 := opentracing.GlobalTracer().StartSpan("ValidateAndPrepare", opentracing.ChildOf(span.Context()))
 	txstatsInfo, updateBatchBytes, err := l.txmgr.ValidateAndPrepare(pvtdataAndBlock, true)
+	span1.Finish()
 	if err != nil {
 		return err
 	}
@@ -645,14 +655,17 @@ func (l *kvLedger) commit(pvtdataAndBlock *ledger.BlockAndPvtData, commitOpts *l
 	logger.Debugf("[%s] Committing pvtdata and block [%d] to storage", l.ledgerID, blockNo)
 	l.blockAPIsRWLock.Lock()
 	defer l.blockAPIsRWLock.Unlock()
+	span2 := opentracing.GlobalTracer().StartSpan("commitToPvtAndBlockStore", opentracing.ChildOf(span.Context()))
 	if err = l.commitToPvtAndBlockStore(pvtdataAndBlock); err != nil {
 		return err
 	}
+	span2.Finish()
 	elapsedBlockstorageAndPvtdataCommit := time.Since(startBlockstorageAndPvtdataCommit)
 
 	startCommitState := time.Now()
 	logger.Debugf("[%s] Committing block [%d] transactions to state database", l.ledgerID, blockNo)
-	if err = l.txmgr.Commit(); err != nil {
+	span3 := opentracing.GlobalTracer().StartSpan("l.txmgr.Commit", opentracing.ChildOf(span.Context()))
+	if err = l.txmgr.Commit(span3); err != nil {
 		panic(errors.WithMessage(err, "error during commit to txmgr"))
 	}
 	elapsedCommitState := time.Since(startCommitState)
@@ -675,12 +688,14 @@ func (l *kvLedger) commit(pvtdataAndBlock *ledger.BlockAndPvtData, commitOpts *l
 		elapsedCommitState/time.Millisecond,
 		l.commitHash,
 	)
+	span4 := opentracing.GlobalTracer().StartSpan("updateBlockStats", opentracing.ChildOf(span.Context()))
 	l.updateBlockStats(
 		elapsedBlockProcessing,
 		elapsedBlockstorageAndPvtdataCommit,
 		elapsedCommitState,
 		txstatsInfo,
 	)
+	span4.Finish()
 	return nil
 }
 

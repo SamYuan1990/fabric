@@ -247,8 +247,12 @@ func (c *coordinator) StoreBlock(block *common.Block, privateDataSets util.PvtDa
 	commitStart := time.Now()
 	// todo tx tracing
 	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy", opentracing.ChildOf(span.Context()))
+	str2 := fmt.Sprint(blockAndPvtData.Block.Header.Number) + "_CommitLegacy"
+	c.logger.Debugf("[%s]", str2)
+	flogging.GetGlobalSpan().SetSpan(str2, CommitLegacy)
 	err = c.CommitLegacy(blockAndPvtData, &ledger.CommitOptions{})
-	CommitLegacy.Finish()
+	//CommitLegacy.Finish()
+	flogging.GetGlobalSpan().CleanSpan(str2)
 	c.reportCommitDuration(time.Since(commitStart))
 	if err != nil {
 		return errors.Wrap(err, "commit failed")

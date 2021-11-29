@@ -26,6 +26,7 @@ import (
 	btltestutil "github.com/hyperledger/fabric/core/ledger/pvtdatapolicy/testutil"
 	"github.com/hyperledger/fabric/internal/pkg/txflags"
 	"github.com/hyperledger/fabric/protoutil"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
@@ -401,7 +402,8 @@ func TestKVLedgerDBRecovery(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, ledger2.(*kvLedger).commitToPvtAndBlockStore(blockAndPvtdata3))
 	// committing the transaction to state DB
-	require.NoError(t, ledger2.(*kvLedger).txmgr.Commit())
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, ledger2.(*kvLedger).txmgr.Commit(CommitLegacy))
 
 	// assume that peer fails here after committing the transaction to state DB but before history DB
 	checkBCSummaryForTest(t, ledger2,

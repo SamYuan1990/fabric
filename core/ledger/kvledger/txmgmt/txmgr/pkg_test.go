@@ -27,6 +27,7 @@ import (
 	btltestutil "github.com/hyperledger/fabric/core/ledger/pvtdatapolicy/testutil"
 	"github.com/hyperledger/fabric/core/ledger/util"
 	"github.com/hyperledger/fabric/internal/pkg/txflags"
+	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -161,7 +162,7 @@ func (h *txMgrTestHelper) validateAndCommitRWSet(txRWSet *rwset.TxReadWriteSet) 
 		}
 	}
 	require.Equal(h.t, 0, invalidTxNum)
-	err = h.txMgr.Commit()
+	err = h.txMgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy"))
 	require.NoError(h.t, err)
 }
 
@@ -216,7 +217,7 @@ func testutilPopulateDB(
 	for _, p := range pvtdataHashes {
 		updates.HashUpdates.Put(ns, p.coll, util.ComputeStringHash(p.key), util.ComputeHash(p.value), version)
 	}
-	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(updates, version))
+	require.NoError(t, txMgr.db.ApplyPrivacyAwareUpdates(updates, version, nil))
 }
 
 type testutilPvtdata struct {

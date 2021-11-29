@@ -92,7 +92,7 @@ func TestValidatorBulkLoadingOfCache(t *testing.T) {
 	batch.HashUpdates.Put(hashedKV1.namespace, hashedKV1.collection, hashedKV1.keyHash, hashedKV1.value, hashedKV1.version)
 	batch.HashUpdates.Put(hashedKV2.namespace, hashedKV2.collection, hashedKV2.keyHash, hashedKV2.value, hashedKV2.version)
 
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4), nil))
 
 	// Construct read set for transaction 1. It contains two public KV pairs (pubKV1, pubKV2) and two
 	// hashed KV pairs (hashedKV1, hashedKV2).
@@ -203,7 +203,7 @@ func TestValidator(t *testing.T) {
 	batch.PubUpdates.Put("ns1", "key3", []byte("value3"), version.NewHeight(1, 2))
 	batch.PubUpdates.Put("ns1", "key4", []byte("value4"), version.NewHeight(1, 3))
 	batch.PubUpdates.Put("ns1", "key5", []byte("value5"), version.NewHeight(1, 4))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4), nil))
 
 	testValidator := &validator{db: db, hashFunc: testHashFunc}
 
@@ -246,7 +246,7 @@ func TestPhantomValidation(t *testing.T) {
 	batch.PubUpdates.Put("ns1", "key3", []byte("value3"), version.NewHeight(1, 2))
 	batch.PubUpdates.Put("ns1", "key4", []byte("value4"), version.NewHeight(1, 3))
 	batch.PubUpdates.Put("ns1", "key5", []byte("value5"), version.NewHeight(1, 4))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 4), nil))
 
 	testValidator := &validator{db: db, hashFunc: testHashFunc}
 
@@ -321,7 +321,7 @@ func TestPhantomHashBasedValidation(t *testing.T) {
 	batch.PubUpdates.Put("ns1", "key7", []byte("value7"), version.NewHeight(1, 6))
 	batch.PubUpdates.Put("ns1", "key8", []byte("value8"), version.NewHeight(1, 7))
 	batch.PubUpdates.Put("ns1", "key9", []byte("value9"), version.NewHeight(1, 8))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 8)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(1, 8), nil))
 
 	testValidator := &validator{db: db, hashFunc: testHashFunc}
 

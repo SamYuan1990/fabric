@@ -25,6 +25,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	btltestutil "github.com/hyperledger/fabric/core/ledger/pvtdatapolicy/testutil"
 	"github.com/hyperledger/fabric/core/ledger/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1008,7 +1009,7 @@ func TestFindAndRemoveStalePvtData(t *testing.T) {
 	batch.HashUpdates.Put("ns2", "coll2", util.ComputeStringHash("key3"), util.ComputeStringHash("value_2_2_3"), version.NewHeight(10, 10))
 
 	// all pvt data associated with the hash updates are missing
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(11, 1)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(batch, version.NewHeight(11, 1), nil))
 
 	// construct pvt data for some of the above missing data. note that no
 	// duplicate entries are expected
@@ -1105,17 +1106,17 @@ func testValidationAndCommitOfOldPvtData(t *testing.T, env testEnv) {
 	updateBatch.HashUpdates.Put("ns1", "coll1", util.ComputeStringHash("key2"), util.ComputeStringHash("value2"), version.NewHeight(1, 2)) // E2
 	updateBatch.HashUpdates.Put("ns1", "coll2", util.ComputeStringHash("key3"), util.ComputeStringHash("value3"), version.NewHeight(1, 2)) // E3
 	updateBatch.HashUpdates.Put("ns1", "coll2", util.ComputeStringHash("key4"), util.ComputeStringHash("value4"), version.NewHeight(1, 3)) // E4
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 2)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 2), nil))
 
 	updateBatch = privacyenabledstate.NewUpdateBatch()
 	updateBatch.HashUpdates.Put("ns1", "coll1", util.ComputeStringHash("key1"), util.ComputeStringHash("new-value1"), version.NewHeight(2, 1)) // E1 is updated
 	updateBatch.HashUpdates.Delete("ns1", "coll1", util.ComputeStringHash("key2"), version.NewHeight(2, 2))                                    // E2 is being deleted
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2), nil))
 
 	updateBatch = privacyenabledstate.NewUpdateBatch()
 	updateBatch.HashUpdates.Put("ns1", "coll1", util.ComputeStringHash("key1"), util.ComputeStringHash("another-new-value1"), version.NewHeight(3, 1)) // E1 is again updated
 	updateBatch.HashUpdates.Put("ns1", "coll2", util.ComputeStringHash("key3"), util.ComputeStringHash("value3"), version.NewHeight(3, 2))             // E3 gets only metadata update
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(3, 2)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(3, 2), nil))
 
 	v1 := []byte("value1")
 	// ns1-coll1-key1 should be rejected as it is updated in the future by Blk2Tx1
@@ -1198,7 +1199,7 @@ func TestTxSimulatorMissingPvtdata(t *testing.T) {
 	updateBatch := privacyenabledstate.NewUpdateBatch()
 	updateBatch.HashUpdates.Put("ns1", "coll1", util.ComputeStringHash("key1"), util.ComputeStringHash("value1"), version.NewHeight(1, 1))
 	updateBatch.PvtUpdates.Put("ns1", "coll1", "key1", []byte("value1"), version.NewHeight(1, 1))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1), nil))
 
 	verifyPvtKeyValue(t, txMgr, "ns1", "coll1", "key1", []byte("value1"))
 
@@ -1207,7 +1208,7 @@ func TestTxSimulatorMissingPvtdata(t *testing.T) {
 	updateBatch.HashUpdates.Put("ns1", "coll2", util.ComputeStringHash("key2"), util.ComputeStringHash("value2"), version.NewHeight(2, 1))
 	updateBatch.HashUpdates.Put("ns1", "coll3", util.ComputeStringHash("key3"), util.ComputeStringHash("value3"), version.NewHeight(2, 1))
 	updateBatch.PvtUpdates.Put("ns1", "coll3", "key3", []byte("value3"), version.NewHeight(2, 1))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 1)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 1), nil))
 
 	verifyPvtKeyVersionStale(t, txMgr, "ns1", "coll1", "key1")
 	verifyPvtKeyVersionStale(t, txMgr, "ns1", "coll2", "key2")
@@ -1243,7 +1244,8 @@ func TestRemoveStaleAndCommitPvtDataOfOldBlocksWithExpiry(t *testing.T) {
 	_, _, err := txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
 	// committing block 1
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy))
 
 	// pvt data should not exist
 	verifyPvtKeyVersionStale(t, txMgr, "ns", "coll", "pvtkey1")
@@ -1269,7 +1271,8 @@ func TestRemoveStaleAndCommitPvtDataOfOldBlocksWithExpiry(t *testing.T) {
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
 	// committing block 2
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy2 := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy2))
 
 	// pvt data should not exist
 	verifyPvtKeyVersionStale(t, txMgr, "ns", "coll", "pvtkey2")
@@ -1279,7 +1282,8 @@ func TestRemoveStaleAndCommitPvtDataOfOldBlocksWithExpiry(t *testing.T) {
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
 	// committing block 3
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy3 := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy3))
 
 	// prepareForExpiringKey must have selected the pvtkey2 as it would
 	// get expired during next block commit
@@ -1304,7 +1308,8 @@ func TestRemoveStaleAndCommitPvtDataOfOldBlocksWithExpiry(t *testing.T) {
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
 	// committing block 4 and should purge pvtkey2
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy4 := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy4))
 	verifyPvtKeyValue(t, txMgr, "ns", "coll", "pvtkey2", nil)
 }
 
@@ -1391,7 +1396,8 @@ func TestTxSimulatorMissingPvtdataExpiry(t *testing.T) {
 		map[string]string{"pubkey1": "pub-value1"}, map[string]string{"pvtkey1": "pvt-value1"}, false)
 	_, _, err := txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy))
 
 	verifyPvtKeyValue(t, txMgr, "ns", "coll", "pvtkey1", []byte("pvt-value1"))
 
@@ -1399,14 +1405,16 @@ func TestTxSimulatorMissingPvtdataExpiry(t *testing.T) {
 		map[string]string{"pubkey1": "pub-value2"}, map[string]string{"pvtkey2": "pvt-value2"}, false)
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy1 := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy1))
 	verifyPvtKeyValue(t, txMgr, "ns", "coll", "pvtkey1", []byte("pvt-value1"))
 
 	blkAndPvtdata = prepareNextBlockForTest(t, txMgr, bg, "txid-2",
 		map[string]string{"pubkey1": "pub-value3"}, map[string]string{"pvtkey3": "pvt-value3"}, false)
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	CommitLegacy2 := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	require.NoError(t, txMgr.Commit(CommitLegacy2))
 	verifyPvtKeyValue(t, txMgr, "ns", "coll", "pvtkey1", nil)
 }
 
@@ -1500,7 +1508,7 @@ func testTxWithPvtdataMetadata(t *testing.T, env testEnv, ns, coll string) {
 	blkAndPvtdata1 := prepareNextBlockForTestFromSimulator(t, bg, s1)
 	_, _, err := txMgr.ValidateAndPrepare(blkAndPvtdata1, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	require.NoError(t, txMgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy")))
 
 	// Run query - key1 and key2 should return both value and metadata. Key3 should still be non-exsting in db
 	qe, _ := txMgr.NewQueryExecutor("test_tx2")
@@ -1519,7 +1527,7 @@ func testTxWithPvtdataMetadata(t *testing.T, env testEnv, ns, coll string) {
 	blkAndPvtdata2 := prepareNextBlockForTestFromSimulator(t, bg, s2)
 	_, _, err = txMgr.ValidateAndPrepare(blkAndPvtdata2, true)
 	require.NoError(t, err)
-	require.NoError(t, txMgr.Commit())
+	require.NoError(t, txMgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy")))
 
 	// Run query - key1 should return updated metadata. Key2 should return 'nil' metadata
 	qe, _ = txMgr.NewQueryExecutor("test_tx4")

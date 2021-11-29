@@ -26,6 +26,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/validation"
 	"github.com/hyperledger/fabric/core/ledger/pvtdatapolicy"
 	"github.com/hyperledger/fabric/core/ledger/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -252,7 +253,7 @@ func (txmgr *LockBasedTxMgr) RemoveStaleAndCommitPvtDataOfOldBlocks(reconciledPv
 
 	// (6) commit the pvt data to the stateDB
 	logger.Debug("Committing updates to state database")
-	return txmgr.db.ApplyPrivacyAwareUpdates(batch, nil)
+	return txmgr.db.ApplyPrivacyAwareUpdates(batch, nil, nil)
 }
 
 type uniquePvtDataMap map[privacyenabledstate.HashedCompositeKey]*privacyenabledstate.PvtKVWrite
@@ -485,7 +486,8 @@ func (txmgr *LockBasedTxMgr) Shutdown() {
 }
 
 // Commit implements method in interface `txmgmt.TxMgr`
-func (txmgr *LockBasedTxMgr) Commit() error {
+func (txmgr *LockBasedTxMgr) Commit(span opentracing.Span) error {
+	defer span.Finish()
 	// we need to acquire a lock on oldBlockCommit. The following are the two reasons:
 	// (1) the DeleteExpiredAndUpdateBookkeeping() would perform incorrect operation if
 	//        toPurgeList is updated by RemoveStaleAndCommitPvtDataOfOldBlocks().
@@ -501,51 +503,67 @@ func (txmgr *LockBasedTxMgr) Commit() error {
 	// 'PrepareForExpiringKeys' is invoked in-line. However, for the subsequent blocks commits, this function is invoked
 	// in advance for the next block
 	if !txmgr.pvtdataPurgeMgr.usedOnce {
+		span4 := opentracing.GlobalTracer().StartSpan("PrepareForExpiringKeys", opentracing.ChildOf(span.Context()))
 		txmgr.pvtdataPurgeMgr.PrepareForExpiringKeys(txmgr.current.blockNum())
 		txmgr.pvtdataPurgeMgr.usedOnce = true
+		span4.Finish()
 	}
-	defer func() {
+	defer func(span opentracing.Span) {
+		span2 := opentracing.GlobalTracer().StartSpan("defer Func", opentracing.ChildOf(span.Context()))
 		txmgr.pvtdataPurgeMgr.PrepareForExpiringKeys(txmgr.current.blockNum() + 1)
 		logger.Debugf("launched the background routine for preparing keys to purge with the next block")
 		txmgr.reset()
-	}()
+		span2.Finish()
+	}(span)
 
 	logger.Debugf("Committing updates to state database")
 	if txmgr.current == nil {
 		panic("validateAndPrepare() method should have been called before calling commit()")
 	}
 
+	span3 := opentracing.GlobalTracer().StartSpan("UpdateExpiryInfo", opentracing.ChildOf(span.Context()))
 	if err := txmgr.pvtdataPurgeMgr.UpdateExpiryInfo(
 		txmgr.current.batch.PvtUpdates, txmgr.current.batch.HashUpdates); err != nil {
 		return err
 	}
+	span3.Finish()
 
+	span5 := opentracing.GlobalTracer().StartSpan("AddExpiredEntriesToUpdateBatch", opentracing.ChildOf(span.Context()))
 	if err := txmgr.pvtdataPurgeMgr.AddExpiredEntriesToUpdateBatch(
 		txmgr.current.batch.PvtUpdates, txmgr.current.batch.HashUpdates); err != nil {
 		return err
 	}
+	span5.Finish()
 
 	commitHeight := version.NewHeight(txmgr.current.blockNum(), txmgr.current.maxTxNumber())
+	span6 := opentracing.GlobalTracer().StartSpan("ApplyPrivacyAwareUpdates", opentracing.ChildOf(span.Context()))
 	txmgr.commitRWLock.Lock()
 	logger.Debugf("Write lock acquired for committing updates to state database")
-	if err := txmgr.db.ApplyPrivacyAwareUpdates(txmgr.current.batch, commitHeight); err != nil {
+	if err := txmgr.db.ApplyPrivacyAwareUpdates(txmgr.current.batch, commitHeight, span6); err != nil {
 		txmgr.commitRWLock.Unlock()
 		return err
 	}
 	txmgr.commitRWLock.Unlock()
+	//span6.Finish()
 	// only while holding a lock on oldBlockCommit, we should clear the cache as the
 	// cache is being used by the old pvtData committer to load the version of
 	// hashedKeys. Also, note that the PrepareForExpiringKeys uses the cache.
+	span8 := opentracing.GlobalTracer().StartSpan("clearCache", opentracing.ChildOf(span.Context()))
 	txmgr.clearCache()
+	span8.Finish()
 	logger.Debugf("Updates committed to state database and the write lock is released")
 
 	// purge manager should be called (in this call the purge mgr removes the expiry entries from schedules) after committing to statedb
+	span7 := opentracing.GlobalTracer().StartSpan("BlockCommitDone", opentracing.ChildOf(span.Context()))
 	if err := txmgr.pvtdataPurgeMgr.BlockCommitDone(); err != nil {
 		return err
 	}
+	span7.Finish()
 	// In the case of error state listeners will not receive this call - instead a peer panic is caused by the ledger upon receiving
 	// an error from this function
+	span9 := opentracing.GlobalTracer().StartSpan("updateStateListeners", opentracing.ChildOf(span.Context()))
 	txmgr.updateStateListeners()
+	span9.Finish()
 	return nil
 }
 
@@ -592,8 +610,10 @@ func (txmgr *LockBasedTxMgr) CommitLostBlock(blockAndPvtdata *ledger.BlockAndPvt
 	} else {
 		logger.Debugf("Recommitting block [%d] to state database", block.Header.Number)
 	}
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy")
+	defer CommitLegacy.Finish()
+	return txmgr.Commit(CommitLegacy)
 
-	return txmgr.Commit()
 }
 
 // ExportPubStateAndPvtStateHashes simply delegates the call to the statedb for exporting the data for a snapshot.

@@ -252,7 +252,7 @@ func TestIncrementPvtdataVersionIfNeeded(t *testing.T) {
 	updateBatch.PvtUpdates.Put("ns", "coll2", "key2", []byte("value2"), version.NewHeight(1, 2))
 	updateBatch.PvtUpdates.Put("ns", "coll3", "key3", []byte("value3"), version.NewHeight(1, 3))
 	updateBatch.PvtUpdates.Put("ns", "col4", "key4", []byte("value4"), version.NewHeight(1, 4))
-	require.NoError(t, testDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 4)))
+	require.NoError(t, testDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 4), nil))
 
 	// for the current block, mimic the resultant hashed updates
 	hashUpdates := privacyenabledstate.NewHashedUpdateBatch()

@@ -18,6 +18,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/mock"
 	"github.com/hyperledger/fabric/core/ledger/util"
 	"github.com/hyperledger/fabric/protoutil"
+	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -84,7 +85,7 @@ func TestStateListener(t *testing.T) {
 		},
 		uint64(1)
 	checkHandleStateUpdatesCallback(t, ml2, 0, expectedLedgerid, expectedStateUpdate, expectedHt)
-	require.NoError(t, txmgr.Commit())
+	require.NoError(t, txmgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy")))
 	require.Equal(t, 1, ml1.StateCommitDoneCallCount())
 	require.Equal(t, 1, ml2.StateCommitDoneCallCount())
 	require.Equal(t, 0, ml3.StateCommitDoneCallCount())
@@ -127,7 +128,7 @@ func TestStateListener(t *testing.T) {
 
 	checkHandleStateUpdatesCallback(t, ml3, 0, expectedLedgerid, expectedStateUpdate, expectedHt)
 
-	require.NoError(t, txmgr.Commit())
+	require.NoError(t, txmgr.Commit(opentracing.GlobalTracer().StartSpan("CommitLegacy")))
 	require.Equal(t, 1, ml1.StateCommitDoneCallCount())
 	require.Equal(t, 1, ml2.StateCommitDoneCallCount())
 	require.Equal(t, 1, ml3.StateCommitDoneCallCount())

@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb/statecouchdb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb/stateleveldb"
 	"github.com/hyperledger/fabric/core/ledger/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -254,14 +255,17 @@ func (s *DB) ApplyUpdates(batch *statedb.UpdateBatch, height *version.Height) er
 }
 
 // ApplyPrivacyAwareUpdates applies the batch to the underlying db
-func (s *DB) ApplyPrivacyAwareUpdates(updates *UpdateBatch, height *version.Height) error {
+func (s *DB) ApplyPrivacyAwareUpdates(updates *UpdateBatch, height *version.Height, span opentracing.Span) error {
 	// combinedUpdates includes both updates to public db and private db, which are partitioned by a separate namespace
+	defer span.Finish()
 	combinedUpdates := updates.PubUpdates
-	addPvtUpdates(combinedUpdates, updates.PvtUpdates)
-	addHashedUpdates(combinedUpdates, updates.HashUpdates, !s.BytesKeySupported())
+	addPvtUpdates(combinedUpdates, updates.PvtUpdates, span)
+	addHashedUpdates(combinedUpdates, updates.HashUpdates, !s.BytesKeySupported(), span)
 	if err := s.metadataHint.setMetadataUsedFlag(updates); err != nil {
 		return err
 	}
+	_span := opentracing.GlobalTracer().StartSpan("VersionedDBApplyUpdates", opentracing.ChildOf(span.Context()))
+	defer _span.Finish()
 	return s.VersionedDB.ApplyUpdates(combinedUpdates.UpdateBatch, height)
 }
 
@@ -374,24 +378,28 @@ func isHashedDataNs(namespace string) bool {
 	return strings.Contains(namespace, nsJoiner+hashDataPrefix)
 }
 
-func addPvtUpdates(pubUpdateBatch *PubUpdateBatch, pvtUpdateBatch *PvtUpdateBatch) {
+func addPvtUpdates(pubUpdateBatch *PubUpdateBatch, pvtUpdateBatch *PvtUpdateBatch, span opentracing.Span) {
 	for ns, nsBatch := range pvtUpdateBatch.UpdateMap {
 		for _, coll := range nsBatch.GetCollectionNames() {
 			for key, vv := range nsBatch.GetUpdates(coll) {
+				_span := opentracing.GlobalTracer().StartSpan("addPvtUpdates", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: key, Value: vv})
 				pubUpdateBatch.Update(derivePvtDataNs(ns, coll), key, vv)
+				_span.Finish()
 			}
 		}
 	}
 }
 
-func addHashedUpdates(pubUpdateBatch *PubUpdateBatch, hashedUpdateBatch *HashedUpdateBatch, base64Key bool) {
+func addHashedUpdates(pubUpdateBatch *PubUpdateBatch, hashedUpdateBatch *HashedUpdateBatch, base64Key bool, span opentracing.Span) {
 	for ns, nsBatch := range hashedUpdateBatch.UpdateMap {
 		for _, coll := range nsBatch.GetCollectionNames() {
 			for key, vv := range nsBatch.GetUpdates(coll) {
+				_span := opentracing.GlobalTracer().StartSpan("addHashedUpdates", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: key, Value: vv})
 				if base64Key {
 					key = base64.StdEncoding.EncodeToString([]byte(key))
 				}
 				pubUpdateBatch.Update(deriveHashedDataNs(ns, coll), key, vv)
+				_span.Finish()
 			}
 		}
 	}

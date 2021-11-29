@@ -160,7 +160,7 @@ func testSnapshotWithSampleData(t *testing.T, env TestEnv,
 		coll := nsColl[1]
 		updateBatch.PvtUpdates.Put(ns, coll, s.Key, s.Value, s.Version)
 	}
-	err := sourceDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2))
+	err := sourceDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2), nil)
 	require.NoError(t, err)
 
 	// export snapshot files from statedb
@@ -303,7 +303,7 @@ func TestSnapshotImportMetadtaHintImport(t *testing.T) {
 		[]byte("metadata"),
 		version.NewHeight(1, 1),
 	)
-	err := sourceDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2))
+	err := sourceDB.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(2, 2), nil)
 	require.NoError(t, err)
 
 	// export snapshot files from statedb
@@ -435,7 +435,7 @@ func TestSnapshotExportErrorPropagation(t *testing.T) {
 		updateBatch := NewUpdateBatch()
 		updateBatch.PubUpdates.Put("ns1", "key1", []byte("value1"), version.NewHeight(1, 1))
 		updateBatch.HashUpdates.Put("ns1", "coll1", []byte("key1"), []byte("value1"), version.NewHeight(1, 1))
-		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1)))
+		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1), nil))
 		snapshotDir, err = ioutil.TempDir("", "testsnapshot")
 		require.NoError(t, err)
 		cleanup = func() {
@@ -511,7 +511,7 @@ func TestSnapshotImportErrorPropagation(t *testing.T) {
 		updateBatch := NewUpdateBatch()
 		updateBatch.PubUpdates.PutValAndMetadata("ns1", "key1", []byte("value1"), []byte("metadata"), version.NewHeight(1, 1))
 		updateBatch.HashUpdates.Put("ns1", "coll1", []byte("key1"), []byte("value1"), version.NewHeight(1, 1))
-		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1)))
+		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1), nil))
 		snapshotDir, err = ioutil.TempDir("", "testsnapshot")
 		require.NoError(t, err)
 		_, err := db.ExportPubStateAndPvtStateHashes(snapshotDir, testNewHashFunc)
@@ -719,7 +719,7 @@ func testSnapshotImportPvtdataHashesConsumer(t *testing.T, dbEnv TestEnv) {
 		updateBatch := NewUpdateBatch()
 		updateBatch.PubUpdates.Put("ns-1", "key-1", []byte("value-1"), version.NewHeight(1, 1))
 		updateBatch.HashUpdates.Put("ns-1", "coll-1", []byte("key-hash-1"), []byte("value-hash-1"), version.NewHeight(1, 1))
-		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1)))
+		require.NoError(t, db.ApplyPrivacyAwareUpdates(updateBatch, version.NewHeight(1, 1), nil))
 		snapshotDir, err = ioutil.TempDir("", "testsnapshot")
 		require.NoError(t, err)
 		_, err = db.ExportPubStateAndPvtStateHashes(snapshotDir, testNewHashFunc)

@@ -74,7 +74,7 @@ func TestMetadataHintOptimizationSkippingGoingToDB(t *testing.T) {
 	updates := NewUpdateBatch()
 	updates.PubUpdates.PutValAndMetadata("ns1", "key", []byte("value"), []byte("metadata"), version.NewHeight(1, 1))
 	updates.PubUpdates.PutValAndMetadata("ns2", "key", []byte("value"), nil, version.NewHeight(1, 2))
-	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(1, 3)))
+	require.NoError(t, db.ApplyPrivacyAwareUpdates(updates, version.NewHeight(1, 3), nil))
 
 	_, err = db.GetStateMetadata("ns1", "randomkey")
 	require.NoError(t, err)
