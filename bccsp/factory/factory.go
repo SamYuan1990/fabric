@@ -55,16 +55,6 @@ func GetDefault() bccsp.BCCSP {
 }
 
 func initBCCSP(f BCCSPFactory, config *FactoryOpts) (bccsp.BCCSP, error) {
-	// global var init
-	/*	var m map[reflect.Type]func(interface{}) bccsp.Key
-		m = make(map[reflect.Type]func(interface{}) bccsp.Key)
-		if option == GM
-			map load GM vars
-			m[reflect.TypeOf(&sm2.PrivateKey{})] = NewSM2PrivateKey
-		else
-			map load ECDSA vars
-			m[reflect.TypeOf(&ecdsa.PrivateKey{})] = NewECDSAPrivateKey*/
-
 	csp, err := f.Get(config)
 	if err != nil {
 		return nil, errors.Errorf("Could not initialize BCCSP %s [%s]", f.Name(), err)
