@@ -151,6 +151,7 @@ func NewBccspMspWithKeyStore(version MSPVersion, keyStore bccsp.KeyStore, bccsp 
 		return nil, err
 	}
 
+	// TWGC todo
 	csp, err := sw.NewWithParams(
 		factory.GetDefaultOpts().SwOpts.SecLevel,
 		factory.GetDefaultOpts().SwOpts.HashFamily,

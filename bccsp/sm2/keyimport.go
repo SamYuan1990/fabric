@@ -7,15 +7,14 @@ package sm2
 
 import (
 	"crypto/ecdsa"
-	"crypto/x509"
 	"errors"
 	"fmt"
 
 	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
+	"github.com/Hyperledger-TWGC/ccs-gm/x509"
 	"github.com/hyperledger/fabric/bccsp"
 )
 
-// TWGC todo
 type SM2PKIXPublicKeyImportOptsKeyImporter struct{}
 
 func (*SM2PKIXPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
@@ -42,7 +41,6 @@ func (*SM2PKIXPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	return &SM2PublicKey{sm2PK}, nil
 }
 
-// TWGC todo
 type SM2PrivateKeyImportOptsKeyImporter struct{}
 
 func (*SM2PrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
@@ -69,7 +67,6 @@ func (*SM2PrivateKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp
 	return &SM2PrivateKey{sm2SK}, nil
 }
 
-// TWGC todo
 type SM2GoPublicKeyImportOptsKeyImporter struct{}
 
 func (*SM2GoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
@@ -83,7 +80,6 @@ func (*SM2GoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bccs
 
 func derToPrivateKey(der []byte) (key interface{}, err error) {
 
-	// TWGC todo tj509?
 	if key, err = x509.ParsePKCS1PrivateKey(der); err == nil {
 		return key, nil
 	}
@@ -112,4 +108,12 @@ func derToPublicKey(raw []byte) (pub interface{}, err error) {
 	key, err := x509.ParsePKIXPublicKey(raw)
 
 	return key, err
+}
+
+func GMPublicKeyFromCert(raw interface{}) interface{} {
+	return raw.(*x509.Certificate).PublicKey
+}
+
+func SM2PublicKeyImport(opts bccsp.KeyImportOpts) bccsp.KeyImportOpts {
+	return &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()}
 }

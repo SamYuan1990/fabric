@@ -14,7 +14,6 @@ import (
 	"github.com/hyperledger/fabric/bccsp"
 )
 
-// TWGC todo
 type SM2KeyGenerator struct {
 	curve elliptic.Curve
 }

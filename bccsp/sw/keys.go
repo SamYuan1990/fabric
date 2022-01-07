@@ -17,9 +17,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-
-	"github.com/Hyperledger-TWGC/ccs-gm/sm2"
-	gmx509 "github.com/Hyperledger-TWGC/ccs-gm/x509"
 )
 
 type pkcs8Info struct {
@@ -40,7 +37,6 @@ var (
 	oidNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
 	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
 	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
-	oidNamedCurveSm2  = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 301}
 )
 
 var oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
@@ -55,9 +51,6 @@ func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 		return oidNamedCurveP384, true
 	case elliptic.P521():
 		return oidNamedCurveP521, true
-	// TWGC todo
-	case sm2.P256():
-		return oidNamedCurveSm2, true
 	}
 	return nil, false
 }
@@ -67,22 +60,13 @@ func PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errors.New("invalid ecdsa private key. It must be different from nil")
 	}
-	// TWGC todo
-	// make this map as global variable
-	var m map[reflect.Type]func(interface{}) ([]byte, error)
-	m = make(map[reflect.Type]func(interface{}) ([]byte, error))
-	m[reflect.TypeOf(&sm2.PrivateKey{})] = SM2PrivateKeyToDER
-	m[reflect.TypeOf(&ecdsa.PrivateKey{})] = ECDSAPrivateKeyToDER
-	for k, v := range m {
+
+	for k, v := range Getpri2der() {
 		if k == reflect.TypeOf(privateKey) {
 			return v(privateKey)
 		}
 	}
 	return nil, errors.New("Failed to recognize the privatekey")
-}
-
-func SM2PrivateKeyToDER(privateKey interface{}) ([]byte, error) {
-	return gmx509.MarshalECPrivateKey(privateKey.(*sm2.PrivateKey))
 }
 
 func ECDSAPrivateKeyToDER(privateKey interface{}) ([]byte, error) {
@@ -98,13 +82,7 @@ func privateKeyToPEM(privateKey interface{}, pwd []byte) ([]byte, error) {
 		return nil, errors.New("invalid key. It must be different from nil")
 	}
 
-	// TWGC todo
-	// make this map as global variable
-	var m map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
-	m = make(map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error))
-	m[reflect.TypeOf(&ecdsa.PrivateKey{})] = ECDSAprivateKeyToPEM
-	m[reflect.TypeOf(&sm2.PrivateKey{})] = SM2privateKeyToPEM
-	for k, v := range m {
+	for k, v := range Getpri2pem() {
 		if k == reflect.TypeOf(privateKey) {
 			return v(privateKey, pwd)
 		}
@@ -158,62 +136,12 @@ func ECDSAprivateKeyToPEM(k interface{}, pwd []byte) ([]byte, error) {
 	), nil
 }
 
-func SM2privateKeyToPEM(k interface{}, pwd []byte) ([]byte, error) {
-	if k.(*sm2.PrivateKey) == nil {
-		return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
-	}
-
-	// get the oid for the curve
-	oidNamedCurve, ok := oidFromNamedCurve(k.(*sm2.PrivateKey).Curve)
-	if !ok {
-		return nil, errors.New("unknown elliptic curve")
-	}
-
-	// based on https://golang.org/src/crypto/x509/sec1.go
-	privateKeyBytes := k.(*sm2.PrivateKey).D.Bytes()
-	paddedPrivateKey := make([]byte, (k.(*sm2.PrivateKey).Curve.Params().N.BitLen()+7)/8)
-	copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
-	// omit NamedCurveOID for compatibility as it's optional
-	asn1Bytes, err := asn1.Marshal(ecPrivateKey{
-		Version:    1,
-		PrivateKey: paddedPrivateKey,
-		PublicKey:  asn1.BitString{Bytes: elliptic.Marshal(k.(*sm2.PrivateKey).Curve, k.(*sm2.PrivateKey).X, k.(*sm2.PrivateKey).Y)},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling SM2 key to asn1 [%s]", err)
-	}
-
-	var pkcs8Key pkcs8Info
-	pkcs8Key.Version = 0
-	pkcs8Key.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 2)
-	pkcs8Key.PrivateKeyAlgorithm[0] = oidPublicKeyECDSA
-	pkcs8Key.PrivateKeyAlgorithm[1] = oidNamedCurve
-	pkcs8Key.PrivateKey = asn1Bytes
-
-	pkcs8Bytes, err := asn1.Marshal(pkcs8Key)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling EC key to asn1 [%s]", err)
-	}
-	return pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "PRIVATE KEY",
-			Bytes: pkcs8Bytes,
-		},
-	), nil
-}
-
 func privateKeyToEncryptedPEM(privateKey interface{}, pwd []byte) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errors.New("invalid private key. It must be different from nil")
 	}
-	// TWGC todo
-	// make this map as global variable
-	var m map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
-	m = make(map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error))
-	m[reflect.TypeOf(&ecdsa.PrivateKey{})] = ECDSAprivateKeyToEncryptedPEM
-	m[reflect.TypeOf(&sm2.PrivateKey{})] = SM2privateKeyToEncryptedPEM
-	for k, v := range m {
+
+	for k, v := range Getpri2epem() {
 		if k == reflect.TypeOf(privateKey) {
 			return v(privateKey, pwd)
 		}
@@ -245,37 +173,6 @@ func ECDSAprivateKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
 	return pem.EncodeToMemory(block), nil
 }
 
-func SM2privateKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
-	if k.(*sm2.PrivateKey) == nil {
-		return nil, errors.New("Invalid sm2 private key. It must be different from nil.")
-	}
-	oid := oidNamedCurveSm2
-	privateKeyBytes := k.(*sm2.PrivateKey).D.Bytes()
-	paddedPrivateKey := make([]byte, (k.(*sm2.PrivateKey).Curve.Params().N.BitLen()+7)/8)
-	copy(paddedPrivateKey[len(paddedPrivateKey)-len(privateKeyBytes):], privateKeyBytes)
-	raw, err := asn1.Marshal(ecPrivateKey{
-		Version:       1,
-		PrivateKey:    paddedPrivateKey,
-		NamedCurveOID: oid,
-		PublicKey:     asn1.BitString{Bytes: elliptic.Marshal(k.(*sm2.PrivateKey).Curve, k.(*sm2.PrivateKey).X, k.(*sm2.PrivateKey).Y)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	block, err := x509.EncryptPEMBlock(
-		rand.Reader,
-		"PRIVATE KEY",
-		raw,
-		pwd,
-		x509.PEMCipherAES256)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return pem.EncodeToMemory(block), nil
-}
-
 func derToPrivateKey(der []byte) (key interface{}, err error) {
 
 	if key, err = x509.ParsePKCS1PrivateKey(der); err == nil {
@@ -284,7 +181,7 @@ func derToPrivateKey(der []byte) (key interface{}, err error) {
 
 	if key, err = x509.ParsePKCS8PrivateKey(der); err == nil {
 		switch key.(type) {
-		case *ecdsa.PrivateKey, *sm2.PrivateKey:
+		case *ecdsa.PrivateKey:
 			return
 		default:
 			return nil, errors.New("found unknown private key type in PKCS#8 wrapping")
@@ -298,7 +195,7 @@ func derToPrivateKey(der []byte) (key interface{}, err error) {
 	return nil, errors.New("invalid key type. The DER must contain an ecdsa.PrivateKey")
 }
 
-func pemToPrivateKey(raw []byte, pwd []byte) (interface{}, error) {
+func PemToPrivateKey(raw []byte, pwd []byte) (interface{}, error) {
 	block, _ := pem.Decode(raw)
 	if block == nil {
 		return nil, fmt.Errorf("failed decoding PEM. Block must be different from nil [% x]", raw)
@@ -389,13 +286,7 @@ func publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 		return nil, errors.New("invalid public key. It must be different from nil")
 	}
 
-	// TWGC todo
-	// make this map as global variable
-	var m map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
-	m = make(map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error))
-	m[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSApublicKeyToPEM
-	m[reflect.TypeOf(&sm2.PublicKey{})] = SM2publicKeyToPEM
-	for k, v := range m {
+	for k, v := range Getpuk2pem() {
 		if k == reflect.TypeOf(publicKey) {
 			return v(publicKey, pwd)
 		}
@@ -421,59 +312,13 @@ func ECDSApublicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
 	), nil
 }
 
-func SM2publicKeyToPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
-	if publicKey.(*sm2.PublicKey) == nil {
-		return nil, errors.New("Invalid ecdsa public key. It must be different from nil.")
-	}
-	PubASN1, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: PubASN1,
-		},
-	), nil
-}
-
 func publicKeyToEncryptedPEM(publicKey interface{}, pwd []byte) ([]byte, error) {
-	// TWGC todo
-	// make this map as global variable
-	var m map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error)
-	m = make(map[reflect.Type]func(k interface{}, pwd []byte) ([]byte, error))
-	m[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSApublicKeyToEncryptedPEM
-	m[reflect.TypeOf(&sm2.PublicKey{})] = SM2publicKeyToEncryptedPEM
-	for k, v := range m {
+	for k, v := range Getpuk2epem() {
 		if k == reflect.TypeOf(publicKey) {
 			return v(publicKey, pwd)
 		}
 	}
 	return nil, errors.New("invalid key type.")
-}
-
-func SM2publicKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {
-	if k.(*sm2.PublicKey) == nil {
-		return nil, errors.New("Invalid sm2 public key. It must be different from nil.")
-	}
-	raw, err := x509.MarshalPKIXPublicKey(k)
-	if err != nil {
-		return nil, err
-	}
-
-	block, err := x509.EncryptPEMBlock(
-		rand.Reader,
-		"PUBLIC KEY",
-		raw,
-		pwd,
-		x509.PEMCipherAES256)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return pem.EncodeToMemory(block), nil
 }
 
 func ECDSApublicKeyToEncryptedPEM(k interface{}, pwd []byte) ([]byte, error) {

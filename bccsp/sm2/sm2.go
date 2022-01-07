@@ -15,7 +15,6 @@ limitations under the License.
 */
 package sm2
 
-// TWGC todo
 import (
 	"crypto/rand"
 	"encoding/asn1"
