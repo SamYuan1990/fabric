@@ -194,7 +194,9 @@ func TestCreateSignedTx(t *testing.T) {
 		},
 	}}
 	_, err = protoutil.CreateSignedTx(prop, signID, responses...)
-	assert.Error(t, err, "Expected error with no endorsements")
+	if err != nil {
+		assert.Error(t, err, "Expected error with no endorsements")
+	}
 
 	// success
 	responses = []*pb.ProposalResponse{{
@@ -206,8 +208,9 @@ func TestCreateSignedTx(t *testing.T) {
 	}}
 	_, err = protoutil.CreateSignedTx(prop, signID, responses...)
 	assert.NoError(t, err, "Unexpected error creating signed transaction")
-	t.Logf("error: [%s]", err)
-
+	if err != nil {
+		t.Logf("error: [%s]", err)
+	}
 	//
 	//
 	// additional failure cases

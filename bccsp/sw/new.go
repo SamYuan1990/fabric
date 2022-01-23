@@ -79,7 +79,6 @@ func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore
 	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SHA384Opts{}), &hasher{hash: sha512.New384})
 	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SHA3_256Opts{}), &hasher{hash: sha3.New256})
 	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SHA3_384Opts{}), &hasher{hash: sha3.New384})
-	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SM3Opts{}), &hasher{hash: sm3.New})
 
 	// Set the key generators
 	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.ECDSAKeyGenOpts{}), &ecdsaKeyGenerator{curve: conf.ellipticCurve})
@@ -107,12 +106,14 @@ func NewWithParams(securityLevel int, hashFamily string, keyStore bccsp.KeyStore
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKey{}), &sm2.SM2Signer{})
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKey{}), &sm2.SM2PrivateKeyVerifier{})
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PublicKey{}), &sm2.SM2PublicKeyKeyVerifier{})
-	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SM2KeyGenOpts{}), &sm2.SM2KeyGenerator{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2KeyGenOpts{}), &sm2.SM2KeyGenerator{})
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKey{}), &sm2.SM2PrivateKeyKeyDeriver{})
 	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PublicKey{}), &sm2.SM2PublicKeyKeyDeriver{})
-	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SM2PKIXPublicKeyImportOpts{}), &sm2.SM2PKIXPublicKeyImportOptsKeyImporter{})
-	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SM2PrivateKeyImportOpts{}), &sm2.SM2PrivateKeyImportOptsKeyImporter{})
-	swbccsp.AddWrapper(reflect.TypeOf(&bccsp.SM2GoPublicKeyImportOpts{}), &sm2.SM2GoPublicKeyImportOptsKeyImporter{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PKIXPublicKeyImportOpts{}), &sm2.SM2PKIXPublicKeyImportOptsKeyImporter{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2PrivateKeyImportOpts{}), &sm2.SM2PrivateKeyImportOptsKeyImporter{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM2GoPublicKeyImportOpts{}), &sm2.SM2GoPublicKeyImportOptsKeyImporter{})
+	swbccsp.AddWrapper(reflect.TypeOf(&sm2.SM3Opts{}), &hasher{hash: sm3.New})
+
 	InitCryptoProviders()
 
 	return swbccsp, nil
@@ -200,6 +201,7 @@ func InitCryptoProviders() {
 	keyMap[reflect.TypeOf(&ecdsaPrivateKey{})] = ECDSAPrivateKeyToInterface
 	keyMap[reflect.TypeOf(&ecdsaPublicKey{})] = ECDSAPublicKeyToInterface
 	keyMap[reflect.TypeOf(&ecdsa.PublicKey{})] = ECDSAPublicKeyToInterface
+
 	//AddWrapper for sm2
 	certImport[reflect.TypeOf(&gmx509.Certificate{})] = sm2.GMPublicKeyFromCert
 	keyImport[reflect.TypeOf(&ccssm2.PublicKey{})] = sm2.SM2PublicKeyImport
@@ -292,6 +294,3 @@ func GetKeyMap() map[reflect.Type]func(interface{}) interface{} {
 	}
 	return keyMap
 }
-
-//privateKey.(*bccspsm2.SM2PrivateKey).GetPrivKey()
-//privateKey.(*).GetPrivKey()

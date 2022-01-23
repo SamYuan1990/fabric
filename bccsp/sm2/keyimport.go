@@ -115,5 +115,5 @@ func GMPublicKeyFromCert(raw interface{}) interface{} {
 }
 
 func SM2PublicKeyImport(opts bccsp.KeyImportOpts) bccsp.KeyImportOpts {
-	return &bccsp.SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()}
+	return &SM2GoPublicKeyImportOpts{Temporary: opts.Ephemeral()}
 }

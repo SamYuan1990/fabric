@@ -14,6 +14,7 @@ github.com/DataDog/zstd
 ## explicit
 github.com/Hyperledger-TWGC/ccs-gm/sm2
 github.com/Hyperledger-TWGC/ccs-gm/sm3
+github.com/Hyperledger-TWGC/ccs-gm/utils
 github.com/Hyperledger-TWGC/ccs-gm/x509
 # github.com/Knetic/govaluate v3.0.0+incompatible
 ## explicit

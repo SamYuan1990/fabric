@@ -26,8 +26,8 @@ func (kd *SM2PublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts)
 
 	switch opts.(type) {
 	// Re-randomized an SM2 public key
-	case *bccsp.SM2ReRandKeyOpts:
-		reRandOpts := opts.(*bccsp.SM2ReRandKeyOpts)
+	case *SM2ReRandKeyOpts:
+		reRandOpts := opts.(*SM2ReRandKeyOpts)
 		tempSK := &sm2.PublicKey{
 			Curve: sm2K.GetPubKey().Curve,
 			X:     new(big.Int),
@@ -70,8 +70,8 @@ func (kd *SM2PrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts
 
 	switch opts.(type) {
 	// Re-randomized an ECDSA private key
-	case *bccsp.SM2ReRandKeyOpts:
-		reRandOpts := opts.(*bccsp.SM2ReRandKeyOpts)
+	case *SM2ReRandKeyOpts:
+		reRandOpts := opts.(*SM2ReRandKeyOpts)
 		tempSK := &sm2.PrivateKey{
 			PublicKey: sm2.PublicKey{
 				Curve: sm2K.PrivKey.Curve,

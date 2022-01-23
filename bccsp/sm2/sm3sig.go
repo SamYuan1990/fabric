@@ -15,27 +15,31 @@ limitations under the License.
 */
 package sm2
 
-import "hash"
+import (
+	"hash"
+
+	"github.com/Hyperledger-TWGC/ccs-gm/sm3"
+	"github.com/hyperledger/fabric/bccsp"
+)
 
 type SM3sig struct {
+	sm3 hash.Hash
 	msg []byte
 }
 
 func NewSM3Sig() hash.Hash {
-	return &SM3sig{}
+
+	return &SM3sig{
+		sm3: sm3.New(),
+	}
 }
 
 func (d *SM3sig) Write(p []byte) (n int, err error) {
-	d.msg = append(d.msg, p...)
-	return len(d.msg), nil
+	return d.sm3.Write(p)
 }
 
 func (d *SM3sig) Sum(b []byte) []byte {
-	if b != nil {
-		panic("sm3sig fail: b must be nil")
-	}
-
-	return d.msg
+	return d.sm3.Sum(b)
 }
 
 func (d *SM3sig) Reset() {
@@ -48,4 +52,10 @@ func (d *SM3sig) Size() int {
 
 func (d *SM3sig) BlockSize() int {
 	return 0
+}
+
+func Hash(msg []byte, opts bccsp.HashOpts) (hash []byte, err error) {
+	instance := NewSM3Sig()
+	instance.Write(msg)
+	return instance.Sum(nil), nil
 }
