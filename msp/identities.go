@@ -9,7 +9,6 @@ package msp
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -30,11 +29,8 @@ type identity struct {
 	// id contains the identifier (MSPID and identity identifier) for this instance
 	id *IdentityIdentifier
 
-	// cert contains the x.509 certificate that signs the public key of this instance
-	cert *x509.Certificate
-
 	// this is the public key of this instance
-	pk bccsp.Key
+	cert bccsp.Cert
 
 	// reference to the MSP that "owns" this identity
 	msp *bccspmsp
@@ -52,13 +48,20 @@ type identity struct {
 	validationErr error
 }
 
-func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity, error) {
+//cert *x509.Certificate
+func newIdentity(idBytes []byte, msp *bccspmsp) (Identity, error) {
 	if mspIdentityLogger.IsEnabledFor(zapcore.DebugLevel) {
-		mspIdentityLogger.Debugf("Creating identity instance for cert %s", certToPEM(cert))
+		mspIdentityLogger.Debugf("Creating identity instance for cert %s", string(idBytes))
+	}
+
+	// get a cert
+	cert, err := bccsp.GetCertFromPem(idBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	// Sanitize first the certificate
-	cert, err := msp.sanitizeCert(cert)
+	cert, err = msp.sanitizeCert(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +84,19 @@ func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity,
 		Id:    hex.EncodeToString(digest),
 	}
 
-	return &identity{id: id, cert: cert, pk: pk, msp: msp}, nil
+	bccsp_cert, err := msp.bccsp.CertImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
+
+	return &identity{id: id, cert: bccsp_cert, msp: msp}, nil
+}
+
+// return ski for private key founding
+func (id *identity) SKI() []byte {
+	return id.cert.SKI()
 }
 
 // ExpiresAt returns the time at which the Identity expires.
 func (id *identity) ExpiresAt() time.Time {
-	return id.cert.NotAfter
+	return id.cert.NotAfter()
 }
 
 // SatisfiesPrincipal returns nil if this instance matches the supplied principal or an error otherwise
@@ -134,7 +144,7 @@ func (id *identity) GetOrganizationalUnits() []*OUIdentifier {
 	}
 
 	var res []*OUIdentifier
-	for _, unit := range id.cert.Subject.OrganizationalUnit {
+	for _, unit := range id.cert.Subject().OrganizationalUnit {
 		res = append(res, &OUIdentifier{
 			OrganizationalUnitIdentifier: unit,
 			CertifiersIdentifier:         cid,
@@ -182,16 +192,16 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
 	}
 
 	if mspIdentityLogger.IsEnabledFor(zapcore.DebugLevel) {
-		mspIdentityLogger.Debugf("Verify: signer identity (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
+		mspIdentityLogger.Debugf("Verify: signer identity (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer(), id.cert.SerialNumber())
 		// mspIdentityLogger.Debugf("Verify: digest = %s", hex.Dump(digest))
 		// mspIdentityLogger.Debugf("Verify: sig = %s", hex.Dump(sig))
 	}
 
-	valid, err := id.msp.bccsp.Verify(id.pk, sig, digest, nil)
+	valid, err := id.msp.bccsp.Verify(id.cert, sig, digest, nil)
 	if err != nil {
 		return errors.WithMessage(err, "could not determine the validity of the signature")
 	} else if !valid {
-		mspIdentityLogger.Warnf("The signature is invalid for (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
+		mspIdentityLogger.Warnf("The signature is invalid for (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer(), id.cert.SerialNumber())
 		return errors.New("The signature is invalid")
 	}
 
@@ -200,7 +210,7 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
 
 // Serialize returns a byte array representation of this identity
 func (id *identity) Serialize() ([]byte, error) {
-	pb := &pem.Block{Bytes: id.cert.Raw, Type: "CERTIFICATE"}
+	pb := &pem.Block{Bytes: id.cert.Raw(), Type: "CERTIFICATE"}
 	pemBytes := pem.EncodeToMemory(pb)
 	if pemBytes == nil {
 		return nil, errors.New("encoding of identity failed")
@@ -234,18 +244,13 @@ type signingidentity struct {
 	signer crypto.Signer
 }
 
-func newSigningIdentity(cert *x509.Certificate, pk bccsp.Key, signer crypto.Signer, msp *bccspmsp) (SigningIdentity, error) {
+func newSigningIdentity(mspId *identity, signer crypto.Signer, msp *bccspmsp) (SigningIdentity, error) {
 	// mspIdentityLogger.Infof("Creating signing identity instance for ID %s", id)
-	mspId, err := newIdentity(cert, pk, msp)
-	if err != nil {
-		return nil, err
-	}
 	return &signingidentity{
 		identity: identity{
-			id:   mspId.(*identity).id,
-			cert: mspId.(*identity).cert,
-			msp:  mspId.(*identity).msp,
-			pk:   mspId.(*identity).pk,
+			id:   mspId.id,
+			cert: mspId.cert,
+			msp:  mspId.msp,
 		},
 		signer: signer,
 	}, nil

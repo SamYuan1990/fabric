@@ -16,6 +16,7 @@ limitations under the License.
 package sw
 
 import (
+	"crypto/x509"
 	"hash"
 	"reflect"
 
@@ -160,6 +161,15 @@ func (csp *CSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Ke
 	}
 
 	return
+}
+
+func (csp *CSP) CertImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Cert, error) {
+	var cert *x509.Certificate
+	cert, ok := raw.(*x509.Certificate)
+	if !ok {
+		return nil, errors.Errorf("Error certificate")
+	}
+	return &ecdsaCert{*cert}, nil
 }
 
 // GetKey returns the key this CSP associates to

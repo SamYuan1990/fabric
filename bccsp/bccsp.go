@@ -8,8 +8,41 @@ package bccsp
 
 import (
 	"crypto"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"hash"
+	"math/big"
+	"time"
+
+	"github.com/pkg/errors"
 )
+
+type Cert interface {
+	Key
+	// *x509.Certificate.NotAfter
+	NotAfter() time.Time
+
+	// *x509.Certificate.Subject
+	Subject() pkix.Name
+
+	//*x509.Certificate.Raw
+	Raw() []byte
+
+	//*x509.Certificate.Issuer
+	Issuer() pkix.Name
+
+	//*x509.Certificate.SerialNumber
+	SerialNumber() *big.Int
+
+	Signature() []byte
+
+	IsCA() bool
+
+	Cert() *x509.Certificate
+
+	Equal(*x509.Certificate) bool
+}
 
 // Key represents a cryptographic key
 type Key interface {
@@ -100,6 +133,7 @@ type BCCSP interface {
 	// The opts argument should be appropriate for the primitive used.
 	KeyImport(raw interface{}, opts KeyImportOpts) (k Key, err error)
 
+	CertImport(raw interface{}, opts KeyImportOpts) (cert Cert, err error)
 	// GetKey returns the key this CSP associates to
 	// the Subject Key Identifier ski.
 	GetKey(ski []byte) (k Key, err error)
@@ -131,4 +165,25 @@ type BCCSP interface {
 	// Decrypt decrypts ciphertext using key k.
 	// The opts argument should be appropriate for the algorithm used.
 	Decrypt(k Key, ciphertext []byte, opts DecrypterOpts) (plaintext []byte, err error)
+}
+
+func GetCertFromPem(idBytes []byte) (*x509.Certificate, error) {
+	if idBytes == nil {
+		return nil, errors.New("getCertFromPem error: nil idBytes")
+	}
+
+	// Decode the pem bytes
+	pemCert, _ := pem.Decode(idBytes)
+	if pemCert == nil {
+		return nil, errors.Errorf("getCertFromPem error: could not decode pem bytes [%v]", idBytes)
+	}
+
+	// get a cert
+	var cert *x509.Certificate
+	cert, err := x509.ParseCertificate(pemCert.Bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "getCertFromPem error: failed to parse x509 cert")
+	}
+
+	return cert, nil
 }

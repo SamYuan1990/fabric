@@ -18,6 +18,7 @@ package sw
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/hyperledger/fabric/bccsp"
@@ -72,4 +73,14 @@ type ecdsaPublicKeyKeyVerifier struct{}
 
 func (v *ecdsaPublicKeyKeyVerifier) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
 	return verifyECDSA(k.(*ecdsaPublicKey).pubKey, signature, digest, opts)
+}
+
+type ecdsaCertVerifier struct{}
+
+func (v *ecdsaCertVerifier) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
+	ecdsaPK, ok := k.(*ecdsaCert).cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return false, errors.New("Failed casting to ECDSA public key. Invalid raw material.")
+	}
+	return verifyECDSA(ecdsaPK, signature, digest, opts)
 }

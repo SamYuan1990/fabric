@@ -163,46 +163,16 @@ func NewBccspMspWithKeyStore(version MSPVersion, keyStore bccsp.KeyStore, bccsp 
 	return thisMSP, nil
 }
 
-func (msp *bccspmsp) getCertFromPem(idBytes []byte) (*x509.Certificate, error) {
+func (msp *bccspmsp) getIdentityFromBytes(idBytes []byte) (Identity, error) {
 	if idBytes == nil {
 		return nil, errors.New("getCertFromPem error: nil idBytes")
 	}
-
-	// Decode the pem bytes
-	pemCert, _ := pem.Decode(idBytes)
-	if pemCert == nil {
-		return nil, errors.Errorf("getCertFromPem error: could not decode pem bytes [%v]", idBytes)
-	}
-
-	// get a cert
-	var cert *x509.Certificate
-	cert, err := x509.ParseCertificate(pemCert.Bytes)
+	mspId, err := newIdentity(idBytes, msp)
 	if err != nil {
-		return nil, errors.Wrap(err, "getCertFromPem error: failed to parse x509 cert")
+		return nil, err
 	}
 
-	return cert, nil
-}
-
-func (msp *bccspmsp) getIdentityFromConf(idBytes []byte) (Identity, bccsp.Key, error) {
-	// get a cert
-	cert, err := msp.getCertFromPem(idBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// get the public key in the right format
-	certPubK, err := msp.bccsp.KeyImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	mspId, err := newIdentity(cert, certPubK, msp)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return mspId, certPubK, nil
+	return mspId, nil
 }
 
 func (msp *bccspmsp) getSigningIdentityFromConf(sidInfo *m.SigningIdentityInfo) (SigningIdentity, error) {
@@ -210,17 +180,24 @@ func (msp *bccspmsp) getSigningIdentityFromConf(sidInfo *m.SigningIdentityInfo) 
 		return nil, errors.New("getIdentityFromBytes error: nil sidInfo")
 	}
 
-	// Extract the public part of the identity
-	idPub, pubKey, err := msp.getIdentityFromConf(sidInfo.PublicSigner)
+	idPub, err := msp.getIdentityFromBytes(sidInfo.PublicSigner)
 	if err != nil {
 		return nil, err
 	}
 
+	// special case for sw based key store
+	// use ski to get private key
+	var ski []byte
+	the_identity, ok := idPub.(*identity)
+	if ok {
+		ski = the_identity.SKI()
+	}
+
 	// Find the matching private key in the BCCSP keystore
-	privKey, err := msp.bccsp.GetKey(pubKey.SKI())
+	privKey, err := msp.bccsp.GetKey(ski)
 	// Less Secure: Attempt to import Private Key from KeyInfo, if BCCSP was not able to find the key
 	if err != nil {
-		mspLogger.Debugf("Could not find SKI [%s], trying KeyMaterial field: %+v\n", hex.EncodeToString(pubKey.SKI()), err)
+		mspLogger.Debugf("Could not find SKI [%s], trying KeyMaterial field: %+v\n", hex.EncodeToString(ski), err)
 		if sidInfo.PrivateSigner == nil || sidInfo.PrivateSigner.KeyMaterial == nil {
 			return nil, errors.New("KeyMaterial not found in SigningIdentityInfo")
 		}
@@ -241,7 +218,7 @@ func (msp *bccspmsp) getSigningIdentityFromConf(sidInfo *m.SigningIdentityInfo) 
 		return nil, errors.WithMessage(err, "getIdentityFromBytes error: Failed initializing bccspCryptoSigner")
 	}
 
-	return newSigningIdentity(idPub.(*identity).cert, idPub.(*identity).pk, peerSigner, msp)
+	return newSigningIdentity(the_identity, peerSigner, msp)
 }
 
 // Setup sets up the internal data structures
@@ -390,34 +367,7 @@ func (msp *bccspmsp) DeserializeIdentity(serializedID []byte) (Identity, error) 
 		return nil, errors.Errorf("expected MSP ID %s, received %s", msp.name, sId.Mspid)
 	}
 
-	return msp.deserializeIdentityInternal(sId.IdBytes)
-}
-
-// deserializeIdentityInternal returns an identity given its byte-level representation
-func (msp *bccspmsp) deserializeIdentityInternal(serializedIdentity []byte) (Identity, error) {
-	// This MSP will always deserialize certs this way
-	bl, _ := pem.Decode(serializedIdentity)
-	if bl == nil {
-		return nil, errors.New("could not decode the PEM structure")
-	}
-	cert, err := x509.ParseCertificate(bl.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "parseCertificate failed")
-	}
-
-	// Now we have the certificate; make sure that its fields
-	// (e.g. the Issuer.OU or the Subject.OU) match with the
-	// MSP id that this MSP has; otherwise it might be an attack
-	// TODO!
-	// We can't do it yet because there is no standardized way
-	// (yet) to encode the MSP ID into the x.509 body of a cert
-
-	pub, err := msp.bccsp.KeyImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to import certificate's public key")
-	}
-
-	return newIdentity(cert, pub, msp)
+	return msp.getIdentityFromBytes(sId.IdBytes)
 }
 
 // SatisfiesPrincipal returns nil if the identity matches the principal or an error otherwise
@@ -529,7 +479,7 @@ func (msp *bccspmsp) satisfiesPrincipalInternalPreV13(id Identity, principal *m.
 			return errors.WithMessage(err, "invalid identity principal, not a certificate")
 		}
 
-		if bytes.Equal(id.(*identity).cert.Raw, principalId.(*identity).cert.Raw) {
+		if bytes.Equal(id.(*identity).cert.Raw(), principalId.(*identity).cert.Raw()) {
 			return principalId.Validate()
 		}
 
@@ -668,7 +618,7 @@ func (msp *bccspmsp) satisfiesPrincipalInternalV142(id Identity, principal *m.MS
 
 func (msp *bccspmsp) isInAdmins(id *identity) bool {
 	for _, admincert := range msp.admins {
-		if bytes.Equal(id.cert.Raw, admincert.(*identity).cert.Raw) {
+		if bytes.Equal(id.cert.Raw(), admincert.(*identity).cert.Raw()) {
 			// we do not need to check whether the admin is a valid identity
 			// according to this MSP, since we already check this at Setup time
 			// if there is a match, we can just return
@@ -676,21 +626,6 @@ func (msp *bccspmsp) isInAdmins(id *identity) bool {
 		}
 	}
 	return false
-}
-
-// getCertificationChain returns the certification chain of the passed identity within this msp
-func (msp *bccspmsp) getCertificationChain(id Identity) ([]*x509.Certificate, error) {
-	mspLogger.Debugf("MSP %s getting certification chain", msp.name)
-
-	switch id := id.(type) {
-	// If this identity is of this specific type,
-	// this is how I can validate it given the
-	// root of trust this MSP has
-	case *identity:
-		return msp.getCertificationChainForBCCSPIdentity(id)
-	default:
-		return nil, errors.New("identity type not recognized")
-	}
 }
 
 // getCertificationChainForBCCSPIdentity returns the certification chain of the passed bccsp identity within this msp
@@ -705,12 +640,12 @@ func (msp *bccspmsp) getCertificationChainForBCCSPIdentity(id *identity) ([]*x50
 	}
 
 	// CAs cannot be directly used as identities..
-	if id.cert.IsCA {
+	if id.cert.IsCA() {
 		return nil, errors.New("An X509 certificate with Basic Constraint: " +
 			"Certificate Authority equals true cannot be used as an identity")
 	}
 
-	return msp.getValidationChain(id.cert, false)
+	return msp.getValidationChain(id.cert.Cert(), false)
 }
 
 func (msp *bccspmsp) getUniqueValidationChain(cert *x509.Certificate, opts x509.VerifyOptions) ([]*x509.Certificate, error) {
@@ -857,7 +792,7 @@ func (msp *bccspmsp) getValidationChain(cert *x509.Certificate, isIntermediateCh
 // getCertificationChainIdentifier returns the certification chain identifier of the passed identity within this msp.
 // The identifier is computes as the SHA256 of the concatenation of the certificates in the chain.
 func (msp *bccspmsp) getCertificationChainIdentifier(id Identity) ([]byte, error) {
-	chain, err := msp.getCertificationChain(id)
+	chain, err := msp.getCertificationChainForBCCSPIdentity(id.(*identity))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed getting certification chain for [%v]", id)
 	}

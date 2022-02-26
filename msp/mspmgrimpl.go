@@ -91,7 +91,7 @@ func (mgr *mspManagerImpl) DeserializeIdentity(serializedID []byte) (Identity, e
 
 	switch t := msp.(type) {
 	case *bccspmsp:
-		return t.deserializeIdentityInternal(sId.IdBytes)
+		return t.getIdentityFromBytes(sId.IdBytes)
 	case *idemixMSPWrapper:
 		return t.deserializeIdentityInternal(sId.IdBytes)
 	default:

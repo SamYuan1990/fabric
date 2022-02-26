@@ -49,11 +49,11 @@ FRBbKkDnSpaVcZgjns+mLdHV2JkF0gk=
 -----END X509 CRL-----`
 
 func TestMSPParsers(t *testing.T) {
-	_, _, err := localMsp.(*bccspmsp).getIdentityFromConf(nil)
+	_, err := localMsp.(*bccspmsp).getIdentityFromBytes(nil)
 	require.Error(t, err)
-	_, _, err = localMsp.(*bccspmsp).getIdentityFromConf([]byte("barf"))
+	_, err = localMsp.(*bccspmsp).getIdentityFromBytes([]byte("barf"))
 	require.Error(t, err)
-	_, _, err = localMsp.(*bccspmsp).getIdentityFromConf([]byte(notACert))
+	_, err = localMsp.(*bccspmsp).getIdentityFromBytes([]byte(notACert))
 	require.Error(t, err)
 
 	_, err = localMsp.(*bccspmsp).getSigningIdentityFromConf(nil)
@@ -823,7 +823,7 @@ func TestCertificationIdentifierComputation(t *testing.T) {
 	id, err := localMsp.GetDefaultSigningIdentity()
 	require.NoError(t, err)
 
-	chain, err := localMsp.(*bccspmsp).getCertificationChain(id.GetPublicVersion())
+	chain, err := localMsp.(*bccspmsp).getCertificationChainForBCCSPIdentity(id.GetPublicVersion().(*identity))
 	require.NoError(t, err)
 
 	// Hash the chain
@@ -1413,7 +1413,7 @@ func getIdentity(t *testing.T, path string) Identity {
 	pems, err := getPemMaterialFromDir(filepath.Join(mspDir, path))
 	require.NoError(t, err)
 
-	id, _, err := localMsp.(*bccspmsp).getIdentityFromConf(pems[0])
+	id, err := localMsp.(*bccspmsp).getIdentityFromBytes(pems[0])
 	require.NoError(t, err)
 
 	return id
@@ -1529,7 +1529,7 @@ func TestMSPIdentityIdentifier(t *testing.T) {
 	require.False(t, lowS)
 
 	// Check that id.(*signingidentity).cert is in LoswS
-	_, S, err = utils.UnmarshalECDSASignature(id.(*signingidentity).cert.Signature)
+	_, S, err = utils.UnmarshalECDSASignature(id.(*signingidentity).cert.Signature())
 	require.NoError(t, err)
 	lowS, err = utils.IsLowS(caCertFromFile.PublicKey.(*ecdsa.PublicKey), S)
 	require.NoError(t, err)

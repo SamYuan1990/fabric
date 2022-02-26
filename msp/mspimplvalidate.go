@@ -54,11 +54,11 @@ func (msp *bccspmsp) validateIdentity(id *identity) error {
 }
 
 func (msp *bccspmsp) validateCAIdentity(id *identity) error {
-	if !id.cert.IsCA {
+	if !id.cert.IsCA() {
 		return errors.New("Only CA identities can be validated")
 	}
 
-	validationChain, err := msp.getUniqueValidationChain(id.cert, msp.getValidityOptsForCert(id.cert))
+	validationChain, err := msp.getUniqueValidationChain(id.cert.Cert(), msp.getValidityOptsForCert(id.cert.Cert()))
 	if err != nil {
 		return errors.WithMessage(err, "could not obtain certification chain")
 	}
@@ -88,7 +88,7 @@ func (msp *bccspmsp) validateTLSCAIdentity(cert *x509.Certificate, opts *x509.Ve
 }
 
 func (msp *bccspmsp) validateIdentityAgainstChain(id *identity, validationChain []*x509.Certificate) error {
-	return msp.validateCertAgainstChain(id.cert, validationChain)
+	return msp.validateCertAgainstChain(id.cert.Cert(), validationChain)
 }
 
 func (msp *bccspmsp) validateCertAgainstChain(cert *x509.Certificate, validationChain []*x509.Certificate) error {

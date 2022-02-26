@@ -61,6 +61,10 @@ func (m *MockBCCSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.
 	return m.KeyImportValue, m.KeyImportErr
 }
 
+func (m *MockBCCSP) CertImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Cert, error) {
+	return nil, nil
+}
+
 func (*MockBCCSP) GetKey(ski []byte) (bccsp.Key, error) {
 	panic("Not yet implemented")
 }

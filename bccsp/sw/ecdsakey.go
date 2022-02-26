@@ -20,8 +20,11 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/hyperledger/fabric/bccsp"
 )
@@ -114,4 +117,97 @@ func (k *ecdsaPublicKey) Private() bool {
 // This method returns an error in symmetric key schemes.
 func (k *ecdsaPublicKey) PublicKey() (bccsp.Key, error) {
 	return k, nil
+}
+
+type ecdsaCert struct {
+	cert x509.Certificate
+}
+
+// Bytes converts this key to its byte representation,
+// if this operation is allowed.
+func (cert *ecdsaCert) Bytes() ([]byte, error) {
+	return cert.cert.Raw, nil
+}
+
+// SKI returns the subject key identifier of this key.
+func (cert *ecdsaCert) SKI() []byte {
+	if cert.cert.PublicKey == nil {
+		return nil
+	}
+
+	// Marshall the public key
+	// *ecdsa.PublicKey
+	ecdsaPK, ok := cert.cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil
+	}
+	raw := elliptic.Marshal(ecdsaPK.Curve, ecdsaPK.X, ecdsaPK.Y)
+
+	// Hash it
+	hash := sha256.New()
+	hash.Write(raw)
+	return hash.Sum(nil)
+}
+
+// Symmetric returns true if this key is a symmetric key,
+// false is this key is asymmetric
+func (cert *ecdsaCert) Symmetric() bool {
+	return false
+}
+
+// Private returns true if this key is a private key,
+// false otherwise.
+func (cert *ecdsaCert) Private() bool {
+	return false
+}
+
+// PublicKey returns the corresponding public key part of an asymmetric public/private key pair.
+// This method returns an error in symmetric key schemes.
+func (cert *ecdsaCert) PublicKey() (bccsp.Key, error) {
+	ecdsaPK, ok := cert.cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New("Failed casting to ECDSA public key. Invalid raw material.")
+	}
+	return &ecdsaPublicKey{ecdsaPK}, nil
+}
+
+// *x509.Certificate.NotAfter
+func (cert *ecdsaCert) NotAfter() time.Time {
+	return cert.cert.NotAfter
+}
+
+// *x509.Certificate.Subject
+func (cert *ecdsaCert) Subject() pkix.Name {
+	return cert.cert.Subject
+}
+
+//*x509.Certificate.Raw
+func (cert *ecdsaCert) Raw() []byte {
+	return cert.cert.Raw
+}
+
+//*x509.Certificate.Issuer
+func (cert *ecdsaCert) Issuer() pkix.Name {
+	return cert.cert.Issuer
+}
+
+//*x509.Certificate.SerialNumber
+func (cert *ecdsaCert) SerialNumber() *big.Int {
+	return cert.cert.SerialNumber
+}
+
+func (cert *ecdsaCert) Signature() []byte {
+	return cert.cert.Signature
+}
+
+func (cert *ecdsaCert) IsCA() bool {
+	return cert.cert.IsCA
+}
+
+func (cert *ecdsaCert) Cert() *x509.Certificate {
+	return &cert.cert
+}
+
+func (cert *ecdsaCert) Equal(c *x509.Certificate) bool {
+	return cert.cert.Equal(c)
 }

@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/hyperledger/fabric-protos-go/msp"
+	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/factory"
 
 	"github.com/onsi/gomega"
 )
@@ -111,11 +113,13 @@ func TestCAValidation(t *testing.T) {
 		mspImpl := &bccspmsp{
 			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
 		}
-		cert, err := mspImpl.getCertFromPem([]byte(caCert))
+		cert, err := bccsp.GetCertFromPem([]byte(caCert))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
 
 		mspImpl.opts.Roots.AddCert(cert)
-		mspImpl.rootCerts = []Identity{&identity{cert: cert}}
+		mspImpl.bccsp = factory.GetDefault()
+		bccsp_cert, _ := mspImpl.bccsp.CertImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
+		mspImpl.rootCerts = []Identity{&identity{cert: bccsp_cert}}
 
 		err = mspImpl.finalizeSetupCAs()
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
@@ -125,11 +129,13 @@ func TestCAValidation(t *testing.T) {
 		mspImpl := &bccspmsp{
 			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
 		}
-		cert, err := mspImpl.getCertFromPem([]byte(nonCACert))
+		cert, err := bccsp.GetCertFromPem([]byte(nonCACert))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
 
 		mspImpl.opts.Roots.AddCert(cert)
-		mspImpl.rootCerts = []Identity{&identity{cert: cert}}
+		mspImpl.bccsp = factory.GetDefault()
+		bccsp_cert, _ := mspImpl.bccsp.CertImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
+		mspImpl.rootCerts = []Identity{&identity{cert: bccsp_cert}}
 
 		err = mspImpl.finalizeSetupCAs()
 		gt.Expect(err).To(gomega.MatchError("CA Certificate did not have the CA attribute, (SN: c9dff7f76657d46f082570f6965051f5)"))
@@ -139,11 +145,13 @@ func TestCAValidation(t *testing.T) {
 		mspImpl := &bccspmsp{
 			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
 		}
-		cert, err := mspImpl.getCertFromPem([]byte(caWithoutSKI))
+		cert, err := bccsp.GetCertFromPem([]byte(caWithoutSKI))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
 
 		mspImpl.opts.Roots.AddCert(cert)
-		mspImpl.rootCerts = []Identity{&identity{cert: cert}}
+		mspImpl.bccsp = factory.GetDefault()
+		bccsp_cert, _ := mspImpl.bccsp.CertImport(cert, &bccsp.X509PublicKeyImportOpts{Temporary: true})
+		mspImpl.rootCerts = []Identity{&identity{cert: bccsp_cert}}
 
 		err = mspImpl.finalizeSetupCAs()
 		gt.Expect(err).To(gomega.MatchError("CA Certificate problem with Subject Key Identifier extension, (SN: ab0ae311f3e32036): subjectKeyIdentifier not found in certificate"))
