@@ -61,7 +61,7 @@ func newIdentity(idBytes []byte, msp *bccspmsp) (Identity, error) {
 	}
 
 	// Sanitize first the certificate
-	cert, err = msp.sanitizeCert(cert)
+	cert, err = bccsp.SanitizeCert(msp.opts, cert)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +92,10 @@ func newIdentity(idBytes []byte, msp *bccspmsp) (Identity, error) {
 // return ski for private key founding
 func (id *identity) SKI() []byte {
 	return id.cert.SKI()
+}
+
+func (id *identity) NotBefore() time.Time {
+	return id.cert.NotBefore()
 }
 
 // ExpiresAt returns the time at which the Identity expires.

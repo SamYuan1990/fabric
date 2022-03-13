@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package msp
+package bccsp
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ type tbsCertificate struct {
 	Extensions         []pkix.Extension `asn1:"optional,explicit,tag:3"`
 }
 
-func isECDSASignedCert(cert *x509.Certificate) bool {
+func IsECDSASignedCert(cert *x509.Certificate) bool {
 	return cert.SignatureAlgorithm == x509.ECDSAWithSHA1 ||
 		cert.SignatureAlgorithm == x509.ECDSAWithSHA256 ||
 		cert.SignatureAlgorithm == x509.ECDSAWithSHA384 ||
@@ -73,7 +73,7 @@ func isECDSASignedCert(cert *x509.Certificate) bool {
 // is in low-S. This is checked against the public key of parentCert.
 // If the signature is not in low-S, then a new certificate is generated
 // that is equals to cert but the signature that is in low-S.
-func sanitizeECDSASignedCert(cert *x509.Certificate, parentCert *x509.Certificate) (*x509.Certificate, error) {
+func SanitizeECDSASignedCert(cert *x509.Certificate, parentCert *x509.Certificate) (*x509.Certificate, error) {
 	if cert == nil {
 		return nil, errors.New("certificate must be different from nil")
 	}
@@ -96,7 +96,7 @@ func sanitizeECDSASignedCert(cert *x509.Certificate, parentCert *x509.Certificat
 	//    the lower level interface that represent an x509 certificate
 	//    encoding
 	var newCert certificate
-	newCert, err = certFromX509Cert(cert)
+	newCert, err = CertFromX509Cert(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func sanitizeECDSASignedCert(cert *x509.Certificate, parentCert *x509.Certificat
 	return x509.ParseCertificate(newRaw)
 }
 
-func certFromX509Cert(cert *x509.Certificate) (certificate, error) {
+func CertFromX509Cert(cert *x509.Certificate) (certificate, error) {
 	var newCert certificate
 	_, err := asn1.Unmarshal(cert.Raw, &newCert)
 	if err != nil {
@@ -141,10 +141,33 @@ func (c certificate) String() string {
 // certToPEM converts the given x509.Certificate to a PEM
 // encoded string
 func certToPEM(certificate *x509.Certificate) string {
-	cert, err := certFromX509Cert(certificate)
+	cert, err := CertFromX509Cert(certificate)
 	if err != nil {
-		mspIdentityLogger.Warning("Failed converting certificate to asn1", err)
+		//("Failed converting certificate to asn1", err)
 		return ""
 	}
 	return cert.String()
+}
+
+func GetUniqueValidationChain(cert *x509.Certificate, opts x509.VerifyOptions) ([]*x509.Certificate, error) {
+	// ask golang to validate the cert for us based on the options that we've built at setup time
+	validationChains, err := cert.Verify(opts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "the supplied identity is not valid")
+	}
+
+	// we only support a single validation chain;
+	// if there's more than one then there might
+	// be unclarity about who owns the identity
+	if len(validationChains) != 1 {
+		return nil, errors.Errorf("this MSP only supports a single validation chain, got %d", len(validationChains))
+	}
+
+	// Make the additional verification checks that were done in Go 1.14.
+	err = VerifyLegacyNameConstraints(validationChains[0])
+	if err != nil {
+		return nil, errors.WithMessage(err, "the supplied identity is not valid")
+	}
+
+	return validationChains[0], nil
 }

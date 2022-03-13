@@ -8,12 +8,8 @@ package msp
 
 import (
 	"bytes"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
-	"strings"
 
 	"github.com/golang/protobuf/proto"
 	m "github.com/hyperledger/fabric-protos-go/msp"
@@ -21,7 +17,6 @@ import (
 	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/bccsp/signer"
 	"github.com/hyperledger/fabric/bccsp/sw"
-	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/pkg/errors"
 )
 
@@ -87,10 +82,10 @@ type bccspmsp struct {
 	name string
 
 	// verification options for MSP members
-	opts *x509.VerifyOptions
+	opts *bccsp.VerifyOptions
 
 	// list of certificate revocation lists
-	CRL []*pkix.CertificateList
+	CRL *bccsp.CRL
 
 	// list of OUs
 	ouIdentifiers map[string][][]byte
@@ -628,275 +623,25 @@ func (msp *bccspmsp) isInAdmins(id *identity) bool {
 	return false
 }
 
-// getCertificationChainForBCCSPIdentity returns the certification chain of the passed bccsp identity within this msp
-func (msp *bccspmsp) getCertificationChainForBCCSPIdentity(id *identity) ([]*x509.Certificate, error) {
-	if id == nil {
-		return nil, errors.New("Invalid bccsp identity. Must be different from nil.")
-	}
-
-	// we expect to have a valid VerifyOptions instance
-	if msp.opts == nil {
-		return nil, errors.New("Invalid msp instance")
-	}
-
-	// CAs cannot be directly used as identities..
-	if id.cert.IsCA() {
-		return nil, errors.New("An X509 certificate with Basic Constraint: " +
-			"Certificate Authority equals true cannot be used as an identity")
-	}
-
-	return msp.getValidationChain(id.cert.Cert(), false)
-}
-
-func (msp *bccspmsp) getUniqueValidationChain(cert *x509.Certificate, opts x509.VerifyOptions) ([]*x509.Certificate, error) {
-	// ask golang to validate the cert for us based on the options that we've built at setup time
-	if msp.opts == nil {
-		return nil, errors.New("the supplied identity has no verify options")
-	}
-	validationChains, err := cert.Verify(opts)
-	if err != nil {
-		return nil, errors.WithMessage(err, "the supplied identity is not valid")
-	}
-
-	// we only support a single validation chain;
-	// if there's more than one then there might
-	// be unclarity about who owns the identity
-	if len(validationChains) != 1 {
-		return nil, errors.Errorf("this MSP only supports a single validation chain, got %d", len(validationChains))
-	}
-
-	// Make the additional verification checks that were done in Go 1.14.
-	err = verifyLegacyNameConstraints(validationChains[0])
-	if err != nil {
-		return nil, errors.WithMessage(err, "the supplied identity is not valid")
-	}
-
-	return validationChains[0], nil
-}
-
-var (
-	oidExtensionSubjectAltName  = asn1.ObjectIdentifier{2, 5, 29, 17}
-	oidExtensionNameConstraints = asn1.ObjectIdentifier{2, 5, 29, 30}
-)
-
-// verifyLegacyNameConstraints exercises the name constraint validation rules
-// that were part of the certificate verification process in Go 1.14.
-//
-// If a signing certificate contains a name constratint, the leaf certificate
-// does not include SAN extensions, and the leaf's common name looks like a
-// host name, the validation would fail with an x509.CertificateInvalidError
-// and a rason of x509.NameConstraintsWithoutSANs.
-func verifyLegacyNameConstraints(chain []*x509.Certificate) error {
-	if len(chain) < 2 {
-		return nil
-	}
-
-	// Leaf certificates with SANs are fine.
-	if oidInExtensions(oidExtensionSubjectAltName, chain[0].Extensions) {
-		return nil
-	}
-	// Leaf certificates without a hostname in CN are fine.
-	if !validHostname(chain[0].Subject.CommonName) {
-		return nil
-	}
-	// If an intermediate or root have a name constraint, validation
-	// would fail in Go 1.14.
-	for _, c := range chain[1:] {
-		if oidInExtensions(oidExtensionNameConstraints, c.Extensions) {
-			return x509.CertificateInvalidError{Cert: chain[0], Reason: x509.NameConstraintsWithoutSANs}
-		}
-	}
-	return nil
-}
-
-func oidInExtensions(oid asn1.ObjectIdentifier, exts []pkix.Extension) bool {
-	for _, ext := range exts {
-		if ext.Id.Equal(oid) {
-			return true
-		}
-	}
-	return false
-}
-
-// validHostname reports whether host is a valid hostname that can be matched or
-// matched against according to RFC 6125 2.2, with some leniency to accommodate
-// legacy values.
-//
-// This implementation is sourced from the standard library.
-func validHostname(host string) bool {
-	host = strings.TrimSuffix(host, ".")
-
-	if len(host) == 0 {
-		return false
-	}
-
-	for i, part := range strings.Split(host, ".") {
-		if part == "" {
-			// Empty label.
-			return false
-		}
-		if i == 0 && part == "*" {
-			// Only allow full left-most wildcards, as those are the only ones
-			// we match, and matching literal '*' characters is probably never
-			// the expected behavior.
-			continue
-		}
-		for j, c := range part {
-			if 'a' <= c && c <= 'z' {
-				continue
-			}
-			if '0' <= c && c <= '9' {
-				continue
-			}
-			if 'A' <= c && c <= 'Z' {
-				continue
-			}
-			if c == '-' && j != 0 {
-				continue
-			}
-			if c == '_' || c == ':' {
-				// Not valid characters in hostnames, but commonly
-				// found in deployments outside the WebPKI.
-				continue
-			}
-			return false
-		}
-	}
-
-	return true
-}
-
-func (msp *bccspmsp) getValidationChain(cert *x509.Certificate, isIntermediateChain bool) ([]*x509.Certificate, error) {
-	validationChain, err := msp.getUniqueValidationChain(cert, msp.getValidityOptsForCert(cert))
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed getting validation chain")
-	}
-
-	// we expect a chain of length at least 2
-	if len(validationChain) < 2 {
-		return nil, errors.Errorf("expected a chain of length at least 2, got %d", len(validationChain))
-	}
-
-	// check that the parent is a leaf of the certification tree
-	// if validating an intermediate chain, the first certificate will the parent
-	parentPosition := 1
-	if isIntermediateChain {
-		parentPosition = 0
-	}
-	if msp.certificationTreeInternalNodesMap[string(validationChain[parentPosition].Raw)] {
-		return nil, errors.Errorf("invalid validation chain. Parent certificate should be a leaf of the certification tree [%v]", cert.Raw)
-	}
-	return validationChain, nil
-}
-
 // getCertificationChainIdentifier returns the certification chain identifier of the passed identity within this msp.
 // The identifier is computes as the SHA256 of the concatenation of the certificates in the chain.
 func (msp *bccspmsp) getCertificationChainIdentifier(id Identity) ([]byte, error) {
-	chain, err := msp.getCertificationChainForBCCSPIdentity(id.(*identity))
+	if id == nil {
+		return nil, errors.New("Invalid bccsp identity. Must be different from nil.")
+	}
+	chain, err := bccsp.GetValidationChain(msp.opts, msp.certificationTreeInternalNodesMap, id.(*identity).cert, false)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed getting certification chain for [%v]", id)
 	}
 
 	// chain[0] is the certificate representing the identity.
 	// It will be discarded
-	return msp.getCertificationChainIdentifierFromChain(chain[1:])
-}
-
-func (msp *bccspmsp) getCertificationChainIdentifierFromChain(chain []*x509.Certificate) ([]byte, error) {
-	// Hash the chain
-	// Use the hash of the identity's certificate as id in the IdentityIdentifier
-	hashOpt, err := bccsp.GetHashOpt(msp.cryptoConfig.IdentityIdentifierHashFunction)
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed getting hash function options")
-	}
-
-	hf, err := msp.bccsp.GetHash(hashOpt)
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed getting hash function when computing certification chain identifier")
-	}
-	for i := 0; i < len(chain); i++ {
-		hf.Write(chain[i].Raw)
-	}
-	return hf.Sum(nil), nil
-}
-
-// sanitizeCert ensures that x509 certificates signed using ECDSA
-// do have signatures in Low-S. If this is not the case, the certificate
-// is regenerated to have a Low-S signature.
-func (msp *bccspmsp) sanitizeCert(cert *x509.Certificate) (*x509.Certificate, error) {
-	if isECDSASignedCert(cert) {
-		// Lookup for a parent certificate to perform the sanitization
-		var parentCert *x509.Certificate
-		chain, err := msp.getUniqueValidationChain(cert, msp.getValidityOptsForCert(cert))
-		if err != nil {
-			return nil, err
-		}
-
-		// at this point, cert might be a root CA certificate
-		// or an intermediate CA certificate
-		if cert.IsCA && len(chain) == 1 {
-			// cert is a root CA certificate
-			parentCert = cert
-		} else {
-			parentCert = chain[1]
-		}
-
-		// Sanitize
-		cert, err = sanitizeECDSASignedCert(cert, parentCert)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return cert, nil
+	return bccsp.GetCertificationChainIdentifierFromChain(msp.bccsp, msp.cryptoConfig.IdentityIdentifierHashFunction, chain[1:])
 }
 
 // IsWellFormed checks if the given identity can be deserialized into its provider-specific form.
 // In this MSP implementation, well formed means that the PEM has a Type which is either
 // the string 'CERTIFICATE' or the Type is missing altogether.
 func (msp *bccspmsp) IsWellFormed(identity *m.SerializedIdentity) error {
-	bl, rest := pem.Decode(identity.IdBytes)
-	if bl == nil {
-		return errors.New("PEM decoding resulted in an empty block")
-	}
-	if len(rest) > 0 {
-		return errors.Errorf("identity %s for MSP %s has trailing bytes", string(identity.IdBytes), identity.Mspid)
-	}
-
-	// Important: This method looks very similar to getCertFromPem(idBytes []byte) (*x509.Certificate, error)
-	// But we:
-	// 1) Must ensure PEM block is of type CERTIFICATE or is empty
-	// 2) Must not replace getCertFromPem with this method otherwise we will introduce
-	//    a change in validation logic which will result in a chain fork.
-	if bl.Type != "CERTIFICATE" && bl.Type != "" {
-		return errors.Errorf("pem type is %s, should be 'CERTIFICATE' or missing", bl.Type)
-	}
-	cert, err := x509.ParseCertificate(bl.Bytes)
-	if err != nil {
-		return err
-	}
-
-	if !isECDSASignedCert(cert) {
-		return nil
-	}
-
-	return isIdentitySignedInCanonicalForm(cert.Signature, identity.Mspid, identity.IdBytes)
-}
-
-func isIdentitySignedInCanonicalForm(sig []byte, mspID string, pemEncodedIdentity []byte) error {
-	r, s, err := utils.UnmarshalECDSASignature(sig)
-	if err != nil {
-		return err
-	}
-
-	expectedSig, err := utils.MarshalECDSASignature(r, s)
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(expectedSig, sig) {
-		return errors.Errorf("identity %s for MSP %s has a non canonical signature",
-			string(pemEncodedIdentity), mspID)
-	}
-
-	return nil
+	return bccsp.IsWellFormed(identity.IdBytes, identity.Mspid)
 }

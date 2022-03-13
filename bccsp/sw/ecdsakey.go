@@ -172,6 +172,11 @@ func (cert *ecdsaCert) PublicKey() (bccsp.Key, error) {
 }
 
 // *x509.Certificate.NotAfter
+func (cert *ecdsaCert) NotBefore() time.Time {
+	return cert.cert.NotBefore
+}
+
+// *x509.Certificate.NotAfter
 func (cert *ecdsaCert) NotAfter() time.Time {
 	return cert.cert.NotAfter
 }

@@ -7,7 +7,6 @@ SPDX-License-Identifier: Apache-2.0
 package msp
 
 import (
-	"crypto/x509"
 	"testing"
 
 	"github.com/hyperledger/fabric-protos-go/msp"
@@ -74,7 +73,7 @@ func TestTLSCAValidation(t *testing.T) {
 
 	t.Run("GoodCert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 
 		err := mspImpl.setupTLSCAs(&msp.FabricMSPConfig{
@@ -85,7 +84,7 @@ func TestTLSCAValidation(t *testing.T) {
 
 	t.Run("NonCACert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 
 		err := mspImpl.setupTLSCAs(&msp.FabricMSPConfig{
@@ -96,7 +95,7 @@ func TestTLSCAValidation(t *testing.T) {
 
 	t.Run("NoSKICert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 
 		err := mspImpl.setupTLSCAs(&msp.FabricMSPConfig{
@@ -111,7 +110,7 @@ func TestCAValidation(t *testing.T) {
 
 	t.Run("GoodCert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 		cert, err := bccsp.GetCertFromPem([]byte(caCert))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
@@ -127,7 +126,7 @@ func TestCAValidation(t *testing.T) {
 
 	t.Run("NonCACert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 		cert, err := bccsp.GetCertFromPem([]byte(nonCACert))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
@@ -143,7 +142,7 @@ func TestCAValidation(t *testing.T) {
 
 	t.Run("NoSKICert", func(t *testing.T) {
 		mspImpl := &bccspmsp{
-			opts: &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
+			opts: bccsp.NewVerifyOptions(),
 		}
 		cert, err := bccsp.GetCertFromPem([]byte(caWithoutSKI))
 		gt.Expect(err).NotTo(gomega.HaveOccurred())
