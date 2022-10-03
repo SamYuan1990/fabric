@@ -10,6 +10,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core/ledger"
+	"github.com/opentracing/opentracing-go"
 )
 
 var logger = flogging.MustGetLogger("committer")
@@ -59,6 +60,8 @@ func NewLedgerCommitter(ledger PeerLedgerSupport) *LedgerCommitter {
 // CommitLegacy commits blocks atomically with private data
 func (lc *LedgerCommitter) CommitLegacy(blockAndPvtData *ledger.BlockAndPvtData, commitOpts *ledger.CommitOptions) error {
 	// Committing new block
+	CommitLegacy := opentracing.GlobalTracer().StartSpan("CommitLegacy in LedgerCommitter")
+	defer CommitLegacy.Finish()
 	if err := lc.PeerLedgerSupport.CommitLegacy(blockAndPvtData, commitOpts); err != nil {
 		return err
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil"
 	"github.com/hyperledger/fabric/protoutil"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -100,6 +101,8 @@ func New(chainID string, cr ChannelResources, ler LedgerResources, lcr Lifecycle
 
 // Dispatch executes the validation plugin(s) for transaction
 func (v *dispatcherImpl) Dispatch(seq int, payload *common.Payload, envBytes []byte, block *common.Block) (peer.TxValidationCode, error) {
+	Dispatch := opentracing.GlobalTracer().StartSpan("Dispatch")
+	defer Dispatch.Finish()
 	chainID := v.chainID
 	logger.Debugf("[%s] Dispatch starts for bytes %p", chainID, envBytes)
 
@@ -206,6 +209,8 @@ func (v *dispatcherImpl) Dispatch(seq int, payload *common.Payload, envBytes []b
 			Policy:     args,
 			PluginName: validationPlugin,
 		}
+		invokeValidationPlugin := opentracing.GlobalTracer().StartSpan("invokeValidationPlugin", opentracing.ChildOf(Dispatch.Context()))
+		defer invokeValidationPlugin.Finish()
 		if err = v.invokeValidationPlugin(ctx); err != nil {
 			switch err.(type) {
 			case *commonerrors.VSCCEndorsementPolicyError:

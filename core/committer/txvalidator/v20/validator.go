@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/fabric/internal/pkg/txflags"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protoutil"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
 
@@ -178,6 +179,8 @@ func (v *TxValidator) chainExists(chain string) bool {
 //    guaranteed to be alone in the block. If/when this assumption
 //    is violated, this code must be changed.
 func (v *TxValidator) Validate(block *common.Block) error {
+	span := opentracing.GlobalTracer().StartSpan("StoreBlock")
+	defer span.Finish()
 	var err error
 	var errPos int
 
@@ -202,7 +205,7 @@ func (v *TxValidator) Validate(block *common.Block) error {
 					d:     data,
 					block: block,
 					tIdx:  index,
-				}, results)
+				}, results, span)
 			}(tIdx, d)
 		}
 	}()
@@ -245,16 +248,20 @@ func (v *TxValidator) Validate(block *common.Block) error {
 
 	// we mark invalid any transaction that has a txid
 	// which is equal to that of a previous tx in this block
+	markTXIdDuplicate := opentracing.GlobalTracer().StartSpan("markTXIdDuplicates", opentracing.ChildOf(span.Context()))
 	markTXIdDuplicates(txidArray, txsfltr)
+	markTXIdDuplicate.Finish()
 
 	// make sure no transaction has skipped validation
-	err = v.allValidated(txsfltr, block)
+	err = v.allValidated(txsfltr, block, span)
 	if err != nil {
 		return err
 	}
 
 	// Initialize metadata structure
+	InitBlockMetadata := opentracing.GlobalTracer().StartSpan("InitBlockMetadata", opentracing.ChildOf(span.Context()))
 	protoutil.InitBlockMetadata(block)
+	InitBlockMetadata.Finish()
 
 	block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER] = txsfltr
 
@@ -266,11 +273,14 @@ func (v *TxValidator) Validate(block *common.Block) error {
 
 // allValidated returns error if some of the validation flags have not been set
 // during validation
-func (v *TxValidator) allValidated(txsfltr txflags.ValidationFlags, block *common.Block) error {
+func (v *TxValidator) allValidated(txsfltr txflags.ValidationFlags, block *common.Block, parent opentracing.Span) error {
 	for id, f := range txsfltr {
+		span := opentracing.GlobalTracer().StartSpan("allValidated", opentracing.ChildOf(parent.Context()), opentracing.Tag{Key: "txid", Value: id})
 		if peer.TxValidationCode(f) == peer.TxValidationCode_NOT_VALIDATED {
+			span.Finish()
 			return errors.Errorf("transaction %d in block %d has skipped validation", id, block.Header.Number)
 		}
+		span.Finish()
 	}
 
 	return nil
@@ -294,7 +304,7 @@ func markTXIdDuplicates(txids []string, txsfltr txflags.ValidationFlags) {
 	}
 }
 
-func (v *TxValidator) validateTx(req *blockValidationRequest, results chan<- *blockValidationResult) {
+func (v *TxValidator) validateTx(req *blockValidationRequest, results chan<- *blockValidationResult, parent opentracing.Span) {
 	block := req.block
 	d := req.d
 	tIdx := req.tIdx
@@ -360,6 +370,8 @@ func (v *TxValidator) validateTx(req *blockValidationRequest, results chan<- *bl
 		if common.HeaderType(chdr.Type) == common.HeaderType_ENDORSER_TRANSACTION {
 
 			txID = chdr.TxId
+			span := opentracing.GlobalTracer().StartSpan("validateTx", opentracing.ChildOf(parent.Context()), opentracing.Tag{Key: "txid", Value: txID})
+			defer span.Finish()
 
 			// Check duplicate transactions
 			erroneousResultEntry := v.checkTxIdDupsLedger(tIdx, chdr, v.LedgerResources)
@@ -370,6 +382,8 @@ func (v *TxValidator) validateTx(req *blockValidationRequest, results chan<- *bl
 
 			// Validate tx with plugins
 			logger.Debug("Validating transaction with plugins")
+			l_span := opentracing.GlobalTracer().StartSpan("Dispatch", opentracing.ChildOf(span.Context()), opentracing.Tag{Key: "txid", Value: txID})
+			defer l_span.Finish()
 			cde, err := v.Dispatcher.Dispatch(tIdx, payload, d, block)
 			if err != nil {
 				logger.Errorf("Dispatch for transaction txId = %s returned error: %s", txID, err)

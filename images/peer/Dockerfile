@@ -25,6 +25,7 @@ WORKDIR $GOPATH/src/github.com/hyperledger/fabric
 
 FROM golang as peer
 ARG GO_TAGS
+ENV GOPROXY="https://goproxy.cn,direct"
 RUN CGO_ENABLED=0 make peer GO_TAGS=${GO_TAGS}
 RUN CGO_ENABLED=0 make ccaasbuilder
 RUN \
